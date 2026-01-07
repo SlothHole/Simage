@@ -1,7 +1,7 @@
 <#
-Run from: C:\AIImageMetaPipe
+Run from: repository root (this directory)
 Example:
-  .\exif_dump.ps1 -InputPath "D:\AI\Images" -OutJsonl ".\out\exif_raw.jsonl"
+  .\exif_dump.ps1 -InputPath ".\Input" -OutJsonl ".\out\exif_raw.jsonl"
 
 Requires:
   exiftool.exe in PATH (recommended) OR set $ExifToolPath below.

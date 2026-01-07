@@ -47,9 +47,9 @@ SQLite must support JSON functions (DB Browser builds usually do)
 
 Quick start (normal workflow)
 
-Run these from PowerShell in:
+Run these from PowerShell in the repository root:
 
-C:\Users\nasty\Documents\MyTools\AIImageMetaPipe
+.
 
 1) Dump metadata using ExifTool
 
@@ -203,7 +203,7 @@ It does not replace the other scripts; it just orchestrates them.
 ### Run it (PowerShell)
 
 Run from:
-`C:\Users\nasty\Documents\MyTools\AIImageMetaPipe`
+`.`
 
 #### 1) Wildcard list of **positive tokens** (most common first)
 

@@ -11,7 +11,7 @@ It DOES NOT duplicate their logic; it simply orchestrates them with subcommands,
 so you only have to remember one command.
 
 Run from (example):
-  C:\Users\nasty\Documents\MyTools\AIImageMetaPipe
+  .
 
 Examples:
 

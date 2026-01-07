@@ -6,8 +6,8 @@ Purpose:
   extract resources (checkpoint / lora / upscaler / controlnet / vae / embedding),
   and populate the `resources` table.
 
-Run in PowerShell from this directory:
-  C:/Users/nasty/Documents/MyTools/AIImageMetaPipe
+Run in PowerShell from this directory (repository root):
+  .
 
 Example:
   python .\parse_resources.py --db .\out\images.db

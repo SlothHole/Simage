@@ -1,5 +1,5 @@
 """
-Run from: C:\AIImageMetaPipe
+Run from: repository root (this directory)
 Example:
   python .\normalize_and_ingest.py --in .\out\exif_raw.jsonl --db .\out\images.db --jsonl .\out\records.jsonl --csv .\out\records.csv
 
