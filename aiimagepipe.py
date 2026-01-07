@@ -3,9 +3,9 @@ aiimagepipe.py
 
 A single entrypoint that combines the three scripts in this repo:
 
-  - normalize_and_ingest.py
+    - pipe_normalize.py
   - parse_resources.py
-  - resolve_resource_refs.py
+    - pipe_resolve.py
 
 It DOES NOT duplicate their logic; it simply orchestrates them with subcommands,
 so you only have to remember one command.
@@ -59,7 +59,7 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     # ingest
-    p_ing = sub.add_parser("ingest", help="Run normalize_and_ingest.py (EXIF JSONL -> images + kv)")
+    p_ing = sub.add_parser("ingest", help="Run pipe_normalize.py (EXIF JSONL -> images + kv)")
     p_ing.add_argument("--in", dest="in_jsonl", default="out/exif_raw.jsonl", help="Input exif_raw.jsonl (one JSON per line)")
     p_ing.add_argument("--db", dest="db_path", default="out/images.db", help="Path to images.db")
     p_ing.add_argument("--schema", dest="schema_path", default="schema.sql", help="Path to schema.sql")
@@ -72,7 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_res.add_argument("--limit", type=int, default=0, help="Optional limit for testing (0 = no limit)")
 
     # resolve
-    p_sol = sub.add_parser("resolve", help="Run resolve_resource_refs.py (resolve resource_ref modelVersionId)")
+    p_sol = sub.add_parser("resolve", help="Run pipe_resolve.py (resolve resource_ref modelVersionId)")
     p_sol.add_argument("--db", default="out/images.db", help="Path to images.db")
     p_sol.add_argument("--import-json", dest="import_json", default="", help="Path to CivitAI export/dump JSON")
     p_sol.add_argument("--import-map", dest="import_map", default="", help="Path to manual mapping file (.json or .csv)")
@@ -97,9 +97,9 @@ def main() -> None:
     args = build_parser().parse_args()
 
     # Import lazily so this file can show help even if modules have issues.
-    import normalize_and_ingest
+    import pipe_normalize
     import parse_resources
-    import resolve_resource_refs
+    import pipe_resolve
 
     if args.cmd == "ingest":
         in_jsonl = resolve_repo_path(args.in_jsonl, must_exist=True, allow_absolute=False)
@@ -108,7 +108,7 @@ def main() -> None:
         out_jsonl = resolve_repo_path(args.out_jsonl, allow_absolute=False)
         out_csv = resolve_repo_path(args.out_csv, allow_absolute=False)
         _run_module_main(
-            normalize_and_ingest.main,
+            pipe_normalize.main,
             [
                 "--in",
                 str(in_jsonl),
@@ -141,7 +141,7 @@ def main() -> None:
             argv += ["--import-map", args.import_map]
         if args.rewrite:
             argv += ["--rewrite"]
-        _run_module_main(resolve_resource_refs.main, argv)
+        _run_module_main(pipe_resolve.main, argv)
         return
 
     if args.cmd == "all":
@@ -151,7 +151,7 @@ def main() -> None:
         out_jsonl = resolve_repo_path(args.out_jsonl, allow_absolute=False)
         out_csv = resolve_repo_path(args.out_csv, allow_absolute=False)
         _run_module_main(
-            normalize_and_ingest.main,
+            pipe_normalize.main,
             [
                 "--in",
                 str(in_jsonl),
@@ -177,7 +177,7 @@ def main() -> None:
             argv += ["--import-map", args.import_map]
         if args.rewrite:
             argv += ["--rewrite"]
-        _run_module_main(resolve_resource_refs.main, argv)
+        _run_module_main(pipe_resolve.main, argv)
         return
 
 

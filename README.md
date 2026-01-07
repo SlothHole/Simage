@@ -22,9 +22,9 @@ AIImageMetaPipe/
   README.md
   schema.sql
   exif_dump.py
-  normalize_and_ingest.py
-  parse_resources.py
-  resolve_resource_refs.py
+  pipe_normalize.py
+  pipe_parse.py
+  pipe_resolve.py
   aiimagepipe.py
   run.ps1
   run.cmd
@@ -66,19 +66,19 @@ python .\exif_dump.py --input .\Input --out .\out\exif_raw.jsonl
 
 This creates/updates out\images.db, and also writes records.jsonl + records.csv.
 
-python .\normalize_and_ingest.py --in .\out\exif_raw.jsonl --db .\out\images.db --schema .\schema.sql --jsonl .\out\records.jsonl --csv .\out\records.csv
+python .\pipe_normalize.py --in .\out\exif_raw.jsonl --db .\out\images.db --schema .\schema.sql --jsonl .\out\records.jsonl --csv .\out\records.csv
 
 3) Parse resources into the resources table
 
 This populates checkpoint / lora / embedding / vae / upscaler entries.
 
-python .\parse_resources.py --db .\out\images.db
+python .\pipe_parse.py --db .\out\images.db
 
 4) (Optional) Resolve resource_ref placeholders
 
 Only needed if your DB contains kind='resource_ref' entries and you want them rewritten into real resources.
 
-python .\resolve_resource_refs.py --db .\out\images.db --rewrite
+python .\pipe_resolve.py --db .\out\images.db --rewrite
 
 # AIImagePipe - Image Processing and EXIF Management Pipeline
 
@@ -119,9 +119,9 @@ AIImagePipe is a comprehensive image pipeline system designed to:
 ├── aiimagepipe.py              # Main application entry point
 ├── exif_dump.py                # EXIF data extraction utilities
 ├── export_wildcards.py         # Wildcard export functionality
-├── normalize_and_ingest.py     # Image normalization & ingestion
-├── parse_resources.py          # Resource parsing logic
-├── resolve_resource_refs.py    # Resource reference resolution
+├── pipe_normalize.py           # Image normalization & ingestion
+├── pipe_parse.py               # Resource parsing logic
+├── pipe_resolve.py             # Resource reference resolution
 ├── path_utils.py               # Path manipulation utilities
 ├── schema.sql                  # Database schema definition
 ├── pyproject.toml              # Project configuration (Poetry/setuptools)
@@ -172,16 +172,16 @@ python -m src.TryCode
 python exif_dump.py
 
 # Normalize and ingest images
-python normalize_and_ingest.py
+python pipe_normalize.py
 
 # Export wildcards
 python export_wildcards.py
 
 # Parse resources
-python parse_resources.py
+python pipe_parse.py
 
 # Resolve resource references
-python resolve_resource_refs.py
+python pipe_resolve.py
 ```
 
 ## Core Modules
@@ -204,19 +204,19 @@ Extracts and dumps EXIF metadata from images.
 - Extracts metadata (camera, lens, ISO, aperture, etc.)
 - Outputs formatted EXIF data
 
-### [normalize_and_ingest.py](normalize_and_ingest.py)
+### [pipe_normalize.py](pipe_normalize.py)
 Normalizes images and ingests them into the database.
 - Validates image formats
 - Normalizes metadata
 - Stores images and metadata in database
 
-### [parse_resources.py](parse_resources.py)
+### [pipe_parse.py](pipe_parse.py)
 Parses resource definitions and configurations.
 - Reads resource files
 - Extracts resource metadata
 - Prepares resources for processing
 
-### [resolve_resource_refs.py](resolve_resource_refs.py)
+### [pipe_resolve.py](pipe_resolve.py)
 Resolves cross-references between resources.
 - Identifies resource relationships
 - Links related resources
@@ -248,15 +248,15 @@ Entry Point: run.cmd / run.ps1 / python -m src.TryCode
     │           │   ├─ Read images from Input/
     │           │   └─ Extract EXIF metadata
     │           │
-    │           ├─→ normalize_and_ingest.py
+    │           ├─→ pipe_normalize.py
     │           │   ├─ Validate image formats
     │           │   ├─ Normalize metadata
     │           │   └─ Store in database (schema.sql)
     │           │
-    │           ├─→ parse_resources.py
+    │           ├─→ pipe_parse.py
     │           │   └─ Parse resource definitions
     │           │
-    │           ├─→ resolve_resource_refs.py
+    │           ├─→ pipe_resolve.py
     │           │   └─ Resolve resource relationships
     │           │
     │           └─→ export_wildcards.py
@@ -276,10 +276,10 @@ Entry Point: run.cmd / run.ps1 / python -m src.TryCode
 ### Image Processing Sequence
 1. **Input Stage**: Scan `Input/` directory
 2. **EXIF Extraction**: `exif_dump.py` → Extract metadata
-3. **Normalization**: `normalize_and_ingest.py` → Standardize formats & metadata
+3. **Normalization**: `pipe_normalize.py` → Standardize formats & metadata
 4. **Database Ingestion**: Store processed images and metadata
-5. **Resource Parsing**: `parse_resources.py` → Parse related resources
-6. **Reference Resolution**: `resolve_resource_refs.py` → Link resources
+5. **Resource Parsing**: `pipe_parse.py` → Parse related resources
+6. **Reference Resolution**: `pipe_resolve.py` → Link resources
 7. **Batch Export**: `export_wildcards.py` → Generate batch patterns
 
 ### Testing
@@ -315,11 +315,11 @@ Edit [`pyproject.toml`](pyproject.toml) to configure:
 
 ### Issue: Database errors during ingestion
 - **Solution**: Verify `schema.sql` is properly initialized
-- **Module**: Check `normalize_and_ingest.py` for data validation
+- **Module**: Check `pipe_normalize.py` for data validation
 
 ### Issue: Resource reference resolution fails
 - **Solution**: Ensure all referenced resources exist
-- **Module**: Debug with `resolve_resource_refs.py` directly
+- **Module**: Debug with `pipe_resolve.py` directly
 
 ### Issue: Tests fail
 - **Solution**: Run tests with verbose output
@@ -512,9 +512,9 @@ Run flow (repository root)
    - `python .\exif_dump.py --input .\Input --out .\out\exif_raw.jsonl`
    - `python .\aiimagepipe.py all`
 2) `aiimagepipe.py all`
-   - `normalize_and_ingest.py` (ingest EXIF JSONL -> DB + exports)
-   - `parse_resources.py` (resources table extraction)
-   - `resolve_resource_refs.py` (optional resource ref resolution; no-op if no mapping provided)
+  - `pipe_normalize.py` (ingest EXIF JSONL -> DB + exports)
+  - `pipe_parse.py` (resources table extraction)
+  - `pipe_resolve.py` (optional resource ref resolution; no-op if no mapping provided)
 
 Repository tree (path layout)
 
@@ -523,9 +523,9 @@ AIImageMetaPipe/
   aiimagepipe.py
   exif_dump.py
   export_wildcards.py
-  normalize_and_ingest.py
-  parse_resources.py
-  resolve_resource_refs.py
+  pipe_normalize.py
+  pipe_parse.py
+  pipe_resolve.py
   path_utils.py
   schema.sql
   run.cmd
@@ -564,13 +564,13 @@ exif_dump.py
 aiimagepipe.py
 - Role: Orchestrator wrapper for subcommands.
 - Inbound: run directly, or via run.ps1/run.cmd.
-- Outbound: imports and calls `normalize_and_ingest.main`, `parse_resources.main`, `resolve_resource_refs.main`.
+- Outbound: imports and calls `pipe_normalize.main`, `pipe_parse.main`, `pipe_resolve.main`.
 - Definitions:
   - `_run_module_main(main_func, argv)`: runs another module main with temporary argv.
   - `build_parser()`: defines subcommands ingest/resources/resolve/all.
   - `main()`: resolves paths, dispatches subcommands.
 
-normalize_and_ingest.py
+pipe_normalize.py
 - Role: Ingest EXIF JSONL into SQLite, normalize metadata, and export JSONL/CSV.
 - Inbound: run directly or via `aiimagepipe.py`.
 - Outbound: reads EXIF JSONL, writes SQLite DB, records.jsonl, records.csv.
@@ -603,7 +603,7 @@ normalize_and_ingest.py
   - `write_csv(csv_path, records)`: writes CSV export.
   - `main()`: CLI entrypoint for ingest.
 
-parse_resources.py
+pipe_parse.py
 - Role: Extract resources from workflow JSON/metadata into `resources` table.
 - Inbound: run directly or via `aiimagepipe.py`.
 - Outbound: reads SQLite DB, writes `resources` rows.
@@ -620,7 +620,7 @@ parse_resources.py
   - `ensure_resources_table(conn)`: ensure table exists.
   - `main()`: CLI entrypoint for resource parsing.
 
-resolve_resource_refs.py
+pipe_resolve.py
 - Role: Resolve placeholder resource refs into real resources.
 - Inbound: run directly or via `aiimagepipe.py`.
 - Outbound: reads SQLite DB, optional mapping JSON/CSV, writes updates.
@@ -665,8 +665,8 @@ path_utils.py
   - `resolve_repo_relative(path_str, ...)`: returns relative + absolute pair.
 
 schema.sql
-- Role: SQLite schema used by normalize_and_ingest.py.
-- Inbound: read by normalize_and_ingest.py (direct or via aiimagepipe.py).
+- Role: SQLite schema used by pipe_normalize.py.
+- Inbound: read by pipe_normalize.py (direct or via aiimagepipe.py).
 - Outbound: defines tables, indexes, constraints.
 
 pyproject.toml
