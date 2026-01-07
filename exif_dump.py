@@ -59,7 +59,9 @@ def json_array_to_jsonl(temp_json: Path, out_jsonl: Path) -> int:
 def main() -> int:
     args = build_parser().parse_args()
 
-    input_path = resolve_repo_path(args.input, must_exist=True, allow_absolute=False)
+    input_path = resolve_repo_path(args.input, must_exist=False, allow_absolute=False)
+    if not input_path.exists():
+        input_path.mkdir(parents=True, exist_ok=True)
     if not input_path.is_dir():
         raise ValueError(f"Input path is not a directory: {input_path}")
 
@@ -67,12 +69,22 @@ def main() -> int:
     out_dir = out_jsonl.parent
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    has_files = any(p.is_file() for p in input_path.rglob("*"))
+    if not has_files:
+        out_jsonl.write_text("", encoding="utf-8")
+        print(f"No input files found in {input_path}. Wrote empty JSONL: {out_jsonl}")
+        return 0
+
     with tempfile.NamedTemporaryFile(prefix="exif_", suffix=".json", dir=out_dir, delete=False) as tmp:
         temp_json = Path(tmp.name)
 
     try:
         run_exiftool(input_path, args.exiftool, temp_json)
         count = json_array_to_jsonl(temp_json, out_jsonl)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"ExifTool not found ({args.exiftool}). Install exiftool or provide --exiftool path."
+        ) from exc
     finally:
         if temp_json.exists():
             temp_json.unlink()
