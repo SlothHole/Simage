@@ -87,6 +87,19 @@ Use these to run the full workflow with default paths (Input/ and out/):
 .\run.ps1
 .\run.cmd
 
+TryCode (package + tests)
+
+This repo also includes a minimal Python package used by the tests.
+
+Quickstart:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+python -m TryCode
+```
+
 Using the “one command” wrapper (aiimagepipe.py)
 
 aiimagepipe.py is a convenience wrapper so you don’t have to remember which script does what.
@@ -309,3 +322,197 @@ resources rows per image
 Your views return meaningful data
 
 Token search returns non-zero counts
+
+Repository flow tree (reference)
+
+This section is a single-source, end-to-end reference for how the repo runs, which files call which, and every function definition.
+
+Run flow (repository root)
+
+1) `.\run.ps1` or `.\run.cmd`
+   - `python .\exif_dump.py --input .\Input --out .\out\exif_raw.jsonl`
+   - `python .\aiimagepipe.py all`
+2) `aiimagepipe.py all`
+   - `normalize_and_ingest.py` (ingest EXIF JSONL -> DB + exports)
+   - `parse_resources.py` (resources table extraction)
+   - `resolve_resource_refs.py` (optional resource ref resolution; no-op if no mapping provided)
+
+Repository tree (path layout)
+
+AIImageMetaPipe/
+  README.md
+  aiimagepipe.py
+  exif_dump.py
+  export_wildcards.py
+  normalize_and_ingest.py
+  parse_resources.py
+  resolve_resource_refs.py
+  path_utils.py
+  schema.sql
+  run.cmd
+  run.ps1
+  pyproject.toml
+  src/
+    TryCode/
+      __init__.py
+      __main__.py
+      core.py
+  tests/
+    test_core.py
+
+File-to-file flow map (role → inbound → outbound)
+
+run.ps1
+- Role: PowerShell launcher.
+- Inbound: user runs `.\run.ps1` from repo root (or any location).
+- Outbound: `python .\exif_dump.py` then `python .\aiimagepipe.py all`.
+
+run.cmd
+- Role: Windows CMD launcher.
+- Inbound: user runs `.\run.cmd` from repo root (or any location).
+- Outbound: `python .\exif_dump.py` then `python .\aiimagepipe.py all`.
+
+exif_dump.py
+- Role: EXIF JSONL dump (ExifTool wrapper).
+- Inbound: run directly, or via run.ps1/run.cmd.
+- Outbound: calls ExifTool, writes `out/exif_raw.jsonl`.
+- Definitions:
+  - `build_parser()`: CLI options for input/out/exiftool.
+  - `run_exiftool(input_path, exiftool, temp_json)`: runs ExifTool and captures JSON.
+  - `json_array_to_jsonl(temp_json, out_jsonl)`: converts JSON array to JSONL.
+  - `main()`: resolves repo paths, handles empty input, writes output.
+
+aiimagepipe.py
+- Role: Orchestrator wrapper for subcommands.
+- Inbound: run directly, or via run.ps1/run.cmd.
+- Outbound: imports and calls `normalize_and_ingest.main`, `parse_resources.main`, `resolve_resource_refs.main`.
+- Definitions:
+  - `_run_module_main(main_func, argv)`: runs another module main with temporary argv.
+  - `build_parser()`: defines subcommands ingest/resources/resolve/all.
+  - `main()`: resolves paths, dispatches subcommands.
+
+normalize_and_ingest.py
+- Role: Ingest EXIF JSONL into SQLite, normalize metadata, and export JSONL/CSV.
+- Inbound: run directly or via `aiimagepipe.py`.
+- Outbound: reads EXIF JSONL, writes SQLite DB, records.jsonl, records.csv.
+- Definitions:
+  - `utc_now_iso()`: timestamp helper.
+  - `stable_id_for_path(path)`: deterministic ID from repo-relative path.
+  - `sha256_file(path)`: file hash.
+  - `is_probably_json(s)`: JSON detection.
+  - `safe_json_loads(s)`: defensive JSON loads.
+  - `first_present(d, keys)`: returns first found key.
+  - `clean_ws(s)`: whitespace cleanup.
+  - `cut_at_tail_markers(s)`: trims prompt tail markers.
+  - `enforce_pos_neg_separation(pos, neg)`: separates pos/neg prompts.
+  - `split_tokens_top_level(s)`: splits tokens at top level.
+  - `token_norm(t)`: token normalization.
+  - `parse_weighted_token(raw)`: parses weighted tokens.
+  - `tokenize_prompt(s)`: tokenizes prompt text.
+  - `norm_keyish(s)`: normalizes key-like strings.
+  - `normalize_sampler(s)`: sampler normalization.
+  - `normalize_scheduler(s)`: scheduler normalization.
+  - `to_int(x)`: safe int conversion.
+  - `to_float(x)`: safe float conversion.
+  - `postprocess_prompts_and_params(rec)`: final prompt/param normalization.
+  - `extract_candidate_blobs(exif_obj)`: candidate EXIF blobs for parsing.
+  - `parse_a1111_parameters(text)`: parses A1111-style parameters.
+  - `parse_comfyui_embedded_json(blob)`: parses ComfyUI JSON blob.
+  - `normalize_record(exif_obj)`: core record normalization.
+  - `init_db(db_path, schema_sql_path)`: initializes DB schema.
+  - `upsert_record(conn, rec)`: inserts/updates DB rows.
+  - `write_csv(csv_path, records)`: writes CSV export.
+  - `main()`: CLI entrypoint for ingest.
+
+parse_resources.py
+- Role: Extract resources from workflow JSON/metadata into `resources` table.
+- Inbound: run directly or via `aiimagepipe.py`.
+- Outbound: reads SQLite DB, writes `resources` rows.
+- Definitions:
+  - `as_float(x)`: float normalization.
+  - `classify_urn(name)`: classify resource type from URN.
+  - `iter_node_dicts(workflow)`: iterate workflow nodes.
+  - `normalize_class_type(node)`: normalize class type.
+  - `get_inputs(node)`: safe inputs extraction.
+  - `extract_from_nodes(workflow)`: resource extraction from nodes.
+  - `extract_from_extra_airs(workflow)`: extra resources extraction.
+  - `extract_from_extra_metadata(workflow)`: extra metadata extraction.
+  - `dedupe_resources(items)`: resource dedupe.
+  - `ensure_resources_table(conn)`: ensure table exists.
+  - `main()`: CLI entrypoint for resource parsing.
+
+resolve_resource_refs.py
+- Role: Resolve placeholder resource refs into real resources.
+- Inbound: run directly or via `aiimagepipe.py`.
+- Outbound: reads SQLite DB, optional mapping JSON/CSV, writes updates.
+- Definitions:
+  - `ensure_table(conn)`: ensures table exists.
+  - `norm_kind(x)`: normalizes resource kinds.
+  - `pick_sha256(obj)`: selects sha256 value.
+  - `merge_extra_json(existing, patch)`: merges JSON payloads.
+  - `upsert_mv(...)`: upserts model version records.
+  - `import_manual_map(conn, path)`: imports manual mapping.
+  - `iter_dicts_deep(x)`: iterates dicts recursively.
+  - `import_civitai_export(conn, path)`: imports CivitAI export.
+  - `rewrite_resources(conn)`: rewrites resource refs.
+  - `main()`: CLI entrypoint for resource ref resolution.
+
+export_wildcards.py
+- Role: Export wildcard text files from DB (tokens/prompts/resources/SQL).
+- Inbound: run directly.
+- Outbound: reads SQLite DB, writes text files under out/.
+- Definitions:
+  - `connect(db_path)`: opens SQLite connection.
+  - `table_exists(conn, name)`: checks for table existence.
+  - `ensure_out_dir(out_path)`: creates output dir.
+  - `write_lines(out_path, lines)`: writes newline-delimited file.
+  - `apply_filters(items, include_re, exclude_re, min_count, max_count)`: filter helper.
+  - `export_tokens(args)`: exports tokens.
+  - `export_prompts(args)`: exports prompts.
+  - `export_kv(args)`: exports key/value items.
+  - `export_resources(args)`: exports resources.
+  - `export_sql(args)`: exports arbitrary SQL query results.
+  - `build_parser()`: CLI parser.
+  - `main()`: CLI entrypoint.
+
+path_utils.py
+- Role: Repo-root anchored path resolution.
+- Inbound: imported by other scripts.
+- Outbound: none.
+- Definitions:
+  - `_reject_parent_segments(path)`: blocks `..` segments.
+  - `resolve_repo_path(path_str, must_exist=False, allow_absolute=False)`: repo-root resolver.
+  - `repo_relative(path)`: converts to repo-relative path.
+  - `resolve_repo_relative(path_str, ...)`: returns relative + absolute pair.
+
+schema.sql
+- Role: SQLite schema used by normalize_and_ingest.py.
+- Inbound: read by normalize_and_ingest.py (direct or via aiimagepipe.py).
+- Outbound: defines tables, indexes, constraints.
+
+pyproject.toml
+- Role: Python project configuration and tool settings.
+- Inbound: used by tooling (pytest, build, etc.).
+- Outbound: none.
+
+src/TryCode/__init__.py
+- Role: Package initialization for TryCode.
+- Inbound: imported by tests or python -m TryCode.
+- Outbound: none.
+
+src/TryCode/__main__.py
+- Role: Module entrypoint for `python -m TryCode`.
+- Inbound: `python -m TryCode`.
+- Outbound: calls `TryCode.core.main`.
+
+src/TryCode/core.py
+- Role: Minimal app function.
+- Inbound: called by `__main__.py`.
+- Outbound: returns 0.
+- Definitions:
+  - `main()`: returns 0.
+
+tests/test_core.py
+- Role: Test for TryCode main.
+- Inbound: `pytest`.
+- Outbound: imports `TryCode.core.main`.
