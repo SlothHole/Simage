@@ -27,6 +27,9 @@ AIImageMetaPipe/
   resolve_resource_refs.py
   aiimagepipe.py
 
+  Input/
+    (your image files go here)
+
   out/
     exif_raw.jsonl        # ExifTool dump (input to ingest)
     images.db             # SQLite database (main output)
@@ -55,7 +58,7 @@ Run these from PowerShell in the repository root:
 
 This creates out\exif_raw.jsonl.
 
-.\exif_dump.ps1
+.\exif_dump.ps1 -InputPath .\Input -OutJsonl .\out\exif_raw.jsonl
 
 2) Normalize + ingest into SQLite
 

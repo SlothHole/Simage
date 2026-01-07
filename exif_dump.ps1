@@ -8,7 +8,7 @@ Requires:
 #>
 
 param(
-  [Parameter(Mandatory=$true)][string]$InputPath,
+  [string]$InputPath = ".\\Input",
   [Parameter(Mandatory=$true)][string]$OutJsonl,
   [string]$ExifToolPath = "exiftool"
 )
