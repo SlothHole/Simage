@@ -80,95 +80,274 @@ Only needed if your DB contains kind='resource_ref' entries and you want them re
 
 python .\resolve_resource_refs.py --db .\out\images.db --rewrite
 
-Quick run scripts
+# AIImagePipe - Image Processing and EXIF Management Pipeline
 
-Use these to run the full workflow with default paths (Input/ and out/):
+A Python-based image processing pipeline that handles image ingestion, EXIF data extraction, resource normalization, and metadata management.
 
-.\run.ps1
-.\run.cmd
+## Table of Contents
 
-TryCode (package + tests)
+- [Overview](#overview)
+- [Project Structure](#project-structure)
+- [Setup & Installation](#setup--installation)
+- [Usage](#usage)
+- [Core Modules](#core-modules)
+- [Execution Flow](#execution-flow)
+- [Database Schema](#database-schema)
+- [Troubleshooting](#troubleshooting)
 
-This repo also includes a minimal Python package used by the tests.
+## Overview
 
-Quickstart:
+AIImagePipe is a comprehensive image pipeline system designed to:
+- Extract and dump EXIF metadata from images
+- Normalize and ingest images into a managed database
+- Parse and resolve resource references
+- Export wildcards for batch processing
+- Manage image paths and metadata relationships
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -U pip
-python -m TryCode
+## Project Structure
+
 ```
 
-Using the “one command” wrapper (aiimagepipe.py)
+├── src/
+│   └── TryCode/
+│       ├── __init__.py          # Package initialization
+│       ├── __main__.py          # Entry point for package execution
+│       └── core.py              # Core pipeline logic
+├── tests/
+│   └── test_core.py             # Unit tests for core functionality
+├── Input/                       # Input directory for source images
+├── aiimagepipe.py              # Main application entry point
+├── exif_dump.py                # EXIF data extraction utilities
+├── export_wildcards.py         # Wildcard export functionality
+├── normalize_and_ingest.py     # Image normalization & ingestion
+├── parse_resources.py          # Resource parsing logic
+├── resolve_resource_refs.py    # Resource reference resolution
+├── path_utils.py               # Path manipulation utilities
+├── schema.sql                  # Database schema definition
+├── pyproject.toml              # Project configuration (Poetry/setuptools)
+├── run.cmd                     # Windows batch execution script
+├── run.ps1                     # PowerShell execution script
+└── README.md                   # This file
+```
 
-aiimagepipe.py is a convenience wrapper so you don’t have to remember which script does what.
+## Setup & Installation
 
-Examples:
+### Requirements
+- Python 3.8+
+- Dependencies specified in `pyproject.toml`
 
-# help
-python .\aiimagepipe.py -h
+### Installation
 
-# run ingest only
-python .\aiimagepipe.py ingest --in .\out\exif_raw.jsonl --db .\out\images.db --schema .\schema.sql --jsonl .\out\records.jsonl --csv .\out\records.csv
+```bash
+# Using pip
+pip install -e .
 
-# parse resources only
-python .\aiimagepipe.py resources --db .\out\images.db
+# Or using Poetry
+poetry install
+```
 
-# run the whole pipeline in order
-python .\aiimagepipe.py all --in .\out\exif_raw.jsonl --db .\out\images.db --schema .\schema.sql --jsonl .\out\records.jsonl --csv .\out\records.csv
+## Usage
 
-What each file does
-schema.sql
+### Running the Pipeline
 
-Defines the SQLite schema (tables and constraints). At minimum this project uses:
+**Windows (Command Prompt):**
+```cmd
+run.cmd
+```
 
-images — one row per image file
+**Windows (PowerShell):**
+```powershell
+./run.ps1
+```
 
-kv — key/value storage for normalized metadata (including JSON fields)
+**Linux/macOS:**
+```bash
+python -m src.TryCode
+```
 
-resources — parsed model resources per image (checkpoint/lora/etc)
+### Direct Module Execution
 
-You also created additional objects via SQL in DB Browser:
+```bash
+# Extract EXIF data
+python exif_dump.py
 
-indexes (performance)
+# Normalize and ingest images
+python normalize_and_ingest.py
 
-views (convenient browsing/querying)
+# Export wildcards
+python export_wildcards.py
 
-tokens (materialized tokens table)
+# Parse resources
+python parse_resources.py
 
-exif_dump.py
+# Resolve resource references
+python resolve_resource_refs.py
+```
 
-Runs ExifTool across your image directory and writes a JSONL dump.
+## Core Modules
 
-Output:
+### [aiimagepipe.py](aiimagepipe.py)
+Main application entry point. Orchestrates the entire pipeline execution.
 
-out\exif_raw.jsonl (one JSON object per file)
+### [src/TryCode/__main__.py](src/TryCode/__main__.py)
+Package entry point that can be executed via `python -m src.TryCode`.
 
-This is meant to be the stable raw input for ingestion.
+### [src/TryCode/core.py](src/TryCode/core.py)
+Core pipeline logic containing primary processing functions:
+- Image processing workflows
+- Metadata handling
+- Pipeline orchestration
 
-normalize_and_ingest.py
+### [exif_dump.py](exif_dump.py)
+Extracts and dumps EXIF metadata from images.
+- Reads image files from `Input/` directory
+- Extracts metadata (camera, lens, ISO, aperture, etc.)
+- Outputs formatted EXIF data
 
-Reads out\exif_raw.jsonl, extracts metadata, normalizes it, and writes:
+### [normalize_and_ingest.py](normalize_and_ingest.py)
+Normalizes images and ingests them into the database.
+- Validates image formats
+- Normalizes metadata
+- Stores images and metadata in database
 
-images table rows
+### [parse_resources.py](parse_resources.py)
+Parses resource definitions and configurations.
+- Reads resource files
+- Extracts resource metadata
+- Prepares resources for processing
 
-kv entries, including:
+### [resolve_resource_refs.py](resolve_resource_refs.py)
+Resolves cross-references between resources.
+- Identifies resource relationships
+- Links related resources
+- Validates reference integrity
 
-prompt_text, neg_prompt_text
+### [export_wildcards.py](export_wildcards.py)
+Exports wildcard patterns for batch processing.
+- Generates wildcard expressions
+- Exports batch processing templates
 
-prompt_tokens, neg_tokens (stored as JSON arrays in kv.v_json)
+### [path_utils.py](path_utils.py)
+Utility functions for path manipulation.
+- Normalizes paths across platforms
+- Resolves relative/absolute paths
+- Manages path conventions
 
-normalized params like steps_norm, cfg_scale_norm, seed_norm, size_norm
+## Execution Flow
 
-normalized sampler/scheduler like sampler_norm, scheduler_norm
+```
+Entry Point: run.cmd / run.ps1 / python -m src.TryCode
+    │
+    ├─→ aiimagepipe.py (Main orchestrator)
+    │   │
+    │   └─→ src/TryCode/__main__.py
+    │       │
+    │       └─→ src/TryCode/core.py (Core pipeline)
+    │           │
+    │           ├─→ exif_dump.py
+    │           │   ├─ Read images from Input/
+    │           │   └─ Extract EXIF metadata
+    │           │
+    │           ├─→ normalize_and_ingest.py
+    │           │   ├─ Validate image formats
+    │           │   ├─ Normalize metadata
+    │           │   └─ Store in database (schema.sql)
+    │           │
+    │           ├─→ parse_resources.py
+    │           │   └─ Parse resource definitions
+    │           │
+    │           ├─→ resolve_resource_refs.py
+    │           │   └─ Resolve resource relationships
+    │           │
+    │           └─→ export_wildcards.py
+    │               └─ Export batch patterns
+    │
+    └─→ path_utils.py (Used throughout pipeline)
+        └─ Path normalization & resolution
+```
 
-Also produces exports:
+## Detailed Function Flow
 
-out\records.jsonl
+### Pipeline Initialization
+1. Load configuration from `pyproject.toml`
+2. Initialize database using `schema.sql`
+3. Set up path utilities via `path_utils.py`
 
-out\records.csv
+### Image Processing Sequence
+1. **Input Stage**: Scan `Input/` directory
+2. **EXIF Extraction**: `exif_dump.py` → Extract metadata
+3. **Normalization**: `normalize_and_ingest.py` → Standardize formats & metadata
+4. **Database Ingestion**: Store processed images and metadata
+5. **Resource Parsing**: `parse_resources.py` → Parse related resources
+6. **Reference Resolution**: `resolve_resource_refs.py` → Link resources
+7. **Batch Export**: `export_wildcards.py` → Generate batch patterns
 
+### Testing
+```bash
+python -m pytest tests/test_core.py -v
+```
+
+## Database Schema
+
+Database configuration defined in [`schema.sql`](schema.sql). Includes tables for:
+- Image metadata
+- EXIF information
+- Resource definitions
+- Reference mappings
+
+## Configuration
+
+Edit [`pyproject.toml`](pyproject.toml) to configure:
+- Package metadata
+- Dependencies
+- Build configuration
+- Entry points
+
+## Troubleshooting
+
+### Issue: Images not found in Input directory
+- **Solution**: Ensure `Input/` directory exists and contains image files
+- **Path**: Check `path_utils.py` for path resolution logic
+
+### Issue: EXIF extraction fails
+- **Solution**: Verify images have EXIF metadata
+- **Module**: Review `exif_dump.py` for supported formats
+
+### Issue: Database errors during ingestion
+- **Solution**: Verify `schema.sql` is properly initialized
+- **Module**: Check `normalize_and_ingest.py` for data validation
+
+### Issue: Resource reference resolution fails
+- **Solution**: Ensure all referenced resources exist
+- **Module**: Debug with `resolve_resource_refs.py` directly
+
+### Issue: Tests fail
+- **Solution**: Run tests with verbose output
+  ```bash
+  python -m pytest tests/test_core.py -v -s
+  ```
+- **Test File**: [`tests/test_core.py`](tests/test_core.py)
+
+## Development
+
+### Running in Development Mode
+```bash
+pip install -e ".[dev]"
+```
+
+### Adding New Modules
+1. Create module in root or appropriate subdirectory
+2. Import in `src/TryCode/core.py`
+3. Add tests in `tests/`
+4. Update this README
+
+## License
+
+See project documentation for license information.
+
+## Contact & Support
+
+For issues or questions, refer to the troubleshooting section or review the execution flow diagram above.
 parse_resources.py
 
 Populates the resources table from embedded metadata sources (ex: CivitAI resources JSON, workflow JSON, A1111-like blocks, etc.).
