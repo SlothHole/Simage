@@ -1,2 +1,3 @@
-# Ignore all files in the out directory
-/out/
+# Ignore all files in the out directory, but keep the folder itself
+/out/*
+!/out/.gitkeep
