@@ -8,6 +8,7 @@ import re
 import sqlite3
 from typing import Iterable, List, Optional, Tuple
 
+from path_utils import resolve_repo_path
 def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
@@ -21,7 +22,7 @@ def table_exists(conn: sqlite3.Connection, name: str) -> bool:
     return row is not None
 
 def ensure_out_dir(out_path: str) -> None:
-    d = os.path.dirname(os.path.abspath(out_path))
+    d = os.path.dirname(out_path)
     if d and not os.path.isdir(d):
         os.makedirs(d, exist_ok=True)
 
@@ -63,7 +64,9 @@ def apply_filters(
     return out
 
 def export_tokens(args) -> int:
-    conn = connect(args.db)
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
+    out_path = resolve_repo_path(args.out, allow_absolute=False)
+    conn = connect(str(db_path))
 
     include_re = re.compile(args.include, re.IGNORECASE) if args.include else None
     exclude_re = re.compile(args.exclude, re.IGNORECASE) if args.exclude else None
@@ -137,12 +140,14 @@ def export_tokens(args) -> int:
             return f"{token}\t{cnt}"
         return token
 
-    n = write_lines(args.out, (fmt(t, c) for t, c in filtered))
-    print(f"Wrote {n} lines -> {args.out}")
+    n = write_lines(str(out_path), (fmt(t, c) for t, c in filtered))
+    print(f"Wrote {n} lines -> {out_path}")
     return 0
 
 def export_prompts(args) -> int:
-    conn = connect(args.db)
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
+    out_path = resolve_repo_path(args.out, allow_absolute=False)
+    conn = connect(str(db_path))
     include_re = re.compile(args.include, re.IGNORECASE) if args.include else None
     exclude_re = re.compile(args.exclude, re.IGNORECASE) if args.exclude else None
 
@@ -178,12 +183,14 @@ def export_prompts(args) -> int:
             return f"{s}\t{cnt}"
         return s
 
-    n = write_lines(args.out, (fmt(t, c) for t, c in filtered))
-    print(f"Wrote {n} lines -> {args.out}")
+    n = write_lines(str(out_path), (fmt(t, c) for t, c in filtered))
+    print(f"Wrote {n} lines -> {out_path}")
     return 0
 
 def export_kv(args) -> int:
-    conn = connect(args.db)
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
+    out_path = resolve_repo_path(args.out, allow_absolute=False)
+    conn = connect(str(db_path))
     include_re = re.compile(args.include, re.IGNORECASE) if args.include else None
     exclude_re = re.compile(args.exclude, re.IGNORECASE) if args.exclude else None
 
@@ -214,12 +221,14 @@ def export_kv(args) -> int:
             return f"{s}\t{cnt}"
         return s
 
-    n = write_lines(args.out, (fmt(t, c) for t, c in filtered))
-    print(f"Wrote {n} lines -> {args.out}")
+    n = write_lines(str(out_path), (fmt(t, c) for t, c in filtered))
+    print(f"Wrote {n} lines -> {out_path}")
     return 0
 
 def export_resources(args) -> int:
-    conn = connect(args.db)
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
+    out_path = resolve_repo_path(args.out, allow_absolute=False)
+    conn = connect(str(db_path))
     include_re = re.compile(args.include, re.IGNORECASE) if args.include else None
     exclude_re = re.compile(args.exclude, re.IGNORECASE) if args.exclude else None
 
@@ -259,23 +268,25 @@ def export_resources(args) -> int:
             return f"{s}\t{cnt}"
         return s
 
-    n = write_lines(args.out, (fmt(t, c) for t, c in filtered))
-    print(f"Wrote {n} lines -> {args.out}")
+    n = write_lines(str(out_path), (fmt(t, c) for t, c in filtered))
+    print(f"Wrote {n} lines -> {out_path}")
     return 0
 
 def export_sql(args) -> int:
-    conn = connect(args.db)
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
+    out_path = resolve_repo_path(args.out, allow_absolute=False)
+    conn = connect(str(db_path))
     rows = conn.execute(args.sql).fetchall()
     if not rows:
-        write_lines(args.out, [])
-        print(f"Wrote 0 lines -> {args.out}")
+        write_lines(str(out_path), [])
+        print(f"Wrote 0 lines -> {out_path}")
         return 0
 
     # Take first column of each row
     first_key = rows[0].keys()[0]
     lines = (str(r[first_key]) for r in rows if r[first_key] is not None)
-    n = write_lines(args.out, lines)
-    print(f"Wrote {n} lines -> {args.out}")
+    n = write_lines(str(out_path), lines)
+    print(f"Wrote {n} lines -> {out_path}")
     return 0
 
 def build_parser() -> argparse.ArgumentParser:

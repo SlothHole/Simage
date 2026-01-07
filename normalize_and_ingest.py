@@ -30,6 +30,8 @@ import sqlite3
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
+from path_utils import resolve_repo_path, resolve_repo_relative
+
 
 # ---------- helpers ----------
 
@@ -38,15 +40,17 @@ def utc_now_iso() -> str:
 
 
 def stable_id_for_path(path: str) -> str:
-    # deterministic UUID from path (so re-ingest doesn’t duplicate)
+    # deterministic UUID from repo-relative path (so re-ingest doesn’t duplicate)
     ns = uuid.UUID("12345678-1234-5678-1234-567812345678")
-    return str(uuid.uuid5(ns, os.path.abspath(path).lower()))
+    rel, _abs = resolve_repo_relative(path, allow_absolute=True)
+    return str(uuid.uuid5(ns, str(rel).lower()))
 
 
 def sha256_file(path: str) -> Optional[str]:
     try:
+        _rel, abs_path = resolve_repo_relative(path, allow_absolute=True)
         h = hashlib.sha256()
-        with open(path, "rb") as f:
+        with open(abs_path, "rb") as f:
             for chunk in iter(lambda: f.read(1024 * 1024), b""):
                 h.update(chunk)
         return h.hexdigest()
@@ -565,8 +569,14 @@ def parse_comfyui_embedded_json(blob: Any) -> Optional[Dict[str, Any]]:
 
 
 def normalize_record(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
-    src = exif_obj.get("SourceFile") or exif_obj.get("File:FileName") or ""
-    file_name = os.path.basename(src) if isinstance(src, str) else None
+    src_raw = exif_obj.get("SourceFile") or exif_obj.get("File:FileName") or ""
+    src = ""
+    src_abs: Optional[str] = None
+    if isinstance(src_raw, str) and src_raw:
+        rel_path, abs_path = resolve_repo_relative(src_raw, allow_absolute=True)
+        src = str(rel_path)
+        src_abs = str(abs_path)
+    file_name = os.path.basename(src) if isinstance(src, str) and src else None
     ext = os.path.splitext(file_name or "")[1].lower().lstrip(".") if file_name else None
 
     width = first_present(exif_obj, ["File:ImageWidth", "EXIF:ImageWidth", "PNG:ImageWidth", "QuickTime:ImageWidth"])
@@ -581,7 +591,7 @@ def normalize_record(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
         "height": int(height) if isinstance(height, (int, float, str)) and str(height).isdigit() else None,
         "imported_utc": utc_now_iso(),
         "created_utc": None,
-        "sha256": sha256_file(src) if isinstance(src, str) and os.path.isfile(src) else None,
+        "sha256": sha256_file(src_abs) if isinstance(src_abs, str) and os.path.isfile(src_abs) else None,
         "format_hint": None,
         "prompt": None,
         "negative_prompt": None,
@@ -795,14 +805,20 @@ def main():
     ap.add_argument("--csv", dest="out_csv", required=True)
     args = ap.parse_args()
 
-    init_db(args.db_path, args.schema_path)
+    in_jsonl = resolve_repo_path(args.in_jsonl, must_exist=True, allow_absolute=False)
+    db_path = resolve_repo_path(args.db_path, allow_absolute=False)
+    schema_path = resolve_repo_path(args.schema_path, must_exist=True, allow_absolute=False)
+    out_jsonl = resolve_repo_path(args.out_jsonl, allow_absolute=False)
+    out_csv = resolve_repo_path(args.out_csv, allow_absolute=False)
+
+    init_db(str(db_path), str(schema_path))
 
     records: List[Dict[str, Any]] = []
-    os.makedirs(os.path.dirname(args.out_jsonl), exist_ok=True)
+    os.makedirs(os.path.dirname(out_jsonl), exist_ok=True)
 
-    with open(args.in_jsonl, "r", encoding="utf-8-sig") as f_in, open(
-        args.out_jsonl, "w", encoding="utf-8"
-    ) as f_out, sqlite3.connect(args.db_path) as conn:
+    with open(in_jsonl, "r", encoding="utf-8-sig") as f_in, open(
+        out_jsonl, "w", encoding="utf-8"
+    ) as f_out, sqlite3.connect(db_path) as conn:
 
         conn.execute("PRAGMA foreign_keys=ON;")
 
@@ -819,8 +835,8 @@ def main():
 
         conn.commit()
 
-    write_csv(args.out_csv, records)
-    print(f"Done.\nDB: {args.db_path}\nJSONL: {args.out_jsonl}\nCSV: {args.out_csv}\nRecords: {len(records)}")
+    write_csv(str(out_csv), records)
+    print(f"Done.\nDB: {db_path}\nJSONL: {out_jsonl}\nCSV: {out_csv}\nRecords: {len(records)}")
 
 
 if __name__ == "__main__":

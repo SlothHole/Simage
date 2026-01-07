@@ -22,10 +22,13 @@ AIImageMetaPipe/
   README.md
   schema.sql
   exif_dump.ps1
+  exif_dump.py
   normalize_and_ingest.py
   parse_resources.py
   resolve_resource_refs.py
   aiimagepipe.py
+  run.ps1
+  run.cmd
 
   Input/
     (your image files go here)
@@ -58,7 +61,7 @@ Run these from PowerShell in the repository root:
 
 This creates out\exif_raw.jsonl.
 
-.\exif_dump.ps1 -InputPath .\Input -OutJsonl .\out\exif_raw.jsonl
+python .\exif_dump.py --input .\Input --out .\out\exif_raw.jsonl
 
 2) Normalize + ingest into SQLite
 
@@ -77,6 +80,13 @@ python .\parse_resources.py --db .\out\images.db
 Only needed if your DB contains kind='resource_ref' entries and you want them rewritten into real resources.
 
 python .\resolve_resource_refs.py --db .\out\images.db --rewrite
+
+Quick run scripts
+
+Use these to run the full workflow with default paths (Input/ and out/):
+
+.\run.ps1
+.\run.cmd
 
 Using the “one command” wrapper (aiimagepipe.py)
 
@@ -115,7 +125,7 @@ views (convenient browsing/querying)
 
 tokens (materialized tokens table)
 
-exif_dump.ps1
+exif_dump.py
 
 Runs ExifTool across your image directory and writes a JSONL dump.
 

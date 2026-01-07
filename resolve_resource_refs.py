@@ -35,6 +35,7 @@ import re
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from path_utils import resolve_repo_path
 
 RE_MVID = re.compile(r"^modelVersionId:(\d+)$", re.IGNORECASE)
 
@@ -201,14 +202,13 @@ def import_manual_map(conn: sqlite3.Connection, path: str) -> int:
       JSON: list of {model_version_id, kind, name, urn, sha256, extra...}
       CSV : columns model_version_id, kind, name, urn, sha256 (extras ignored)
     """
-    if not os.path.exists(path):
-        raise FileNotFoundError(path)
+    map_path = resolve_repo_path(path, must_exist=True, allow_absolute=False)
 
     n = 0
-    _, ext = os.path.splitext(path.lower())
+    _, ext = os.path.splitext(str(map_path).lower())
 
     if ext == ".csv":
-        with open(path, "r", encoding="utf-8-sig", newline="") as f:
+        with open(map_path, "r", encoding="utf-8-sig", newline="") as f:
             r = csv.DictReader(f)
             for row in r:
                 mvid = row.get("model_version_id") or row.get("modelVersionId") or row.get("mvid")
@@ -224,7 +224,7 @@ def import_manual_map(conn: sqlite3.Connection, path: str) -> int:
         return n
 
     # default JSON
-    with open(path, "r", encoding="utf-8") as f:
+    with open(map_path, "r", encoding="utf-8") as f:
         obj = json.load(f)
 
     items: List[Dict[str, Any]] = []
@@ -273,10 +273,9 @@ def import_civitai_export(conn: sqlite3.Connection, path: str) -> int:
     Best-effort import from a CivitAI export/dump JSON.
     We search deeply for dicts that look like "model version" records.
     """
-    if not os.path.exists(path):
-        raise FileNotFoundError(path)
+    export_path = resolve_repo_path(path, must_exist=True, allow_absolute=False)
 
-    with open(path, "r", encoding="utf-8") as f:
+    with open(export_path, "r", encoding="utf-8") as f:
         root = json.load(f)
 
     n = 0
@@ -424,10 +423,9 @@ def main() -> None:
     ap.add_argument("--rewrite", action="store_true", help="Rewrite resources.resource_ref into resolved resources")
     args = ap.parse_args()
 
-    if not os.path.exists(args.db):
-        raise FileNotFoundError(args.db)
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
 
-    with sqlite3.connect(args.db) as conn:
+    with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         ensure_table(conn)
 

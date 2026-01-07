@@ -23,6 +23,7 @@ import json
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from path_utils import resolve_repo_path
 
 # ----------------- small helpers -----------------
 
@@ -357,7 +358,9 @@ def main() -> None:
     ap.add_argument("--limit", type=int, default=0, help="Optional limit for testing (0 = no limit)")
     args = ap.parse_args()
 
-    with sqlite3.connect(args.db) as conn:
+    db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
+
+    with sqlite3.connect(db_path) as conn:
         conn.row_factory = sqlite3.Row
         ensure_resources_table(conn)
 
