@@ -21,7 +21,6 @@ Recommended layout:
 AIImageMetaPipe/
   README.md
   schema.sql
-  exif_dump.ps1
   exif_dump.py
   normalize_and_ingest.py
   parse_resources.py
