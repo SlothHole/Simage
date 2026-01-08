@@ -8,7 +8,7 @@ import re
 import sqlite3
 from typing import Iterable, List, Optional, Tuple
 
-from path_utils import resolve_repo_path
+from simage.path_utils import resolve_repo_path
 def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

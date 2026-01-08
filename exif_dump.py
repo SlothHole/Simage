@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from path_utils import resolve_repo_path
+from simage.path_utils import resolve_repo_path
 
 
 def build_parser() -> argparse.ArgumentParser:

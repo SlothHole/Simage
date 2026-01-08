@@ -38,7 +38,7 @@ import argparse
 import sys
 from typing import Callable, List, Optional
 
-from path_utils import resolve_repo_path
+from simage.path_utils import resolve_repo_path
 
 
 def _run_module_main(main_func: Callable[[], None], argv: List[str]) -> None:
@@ -97,9 +97,9 @@ def main() -> None:
     args = build_parser().parse_args()
 
     # Import lazily so this file can show help even if modules have issues.
-    import pipe_normalize
-    import parse_resources
-    import pipe_resolve
+    from simage import pipe_normalize
+    from simage import parse_resources
+    from simage import pipe_resolve
 
     if args.cmd == "ingest":
         in_jsonl = resolve_repo_path(args.in_jsonl, must_exist=True, allow_absolute=False)

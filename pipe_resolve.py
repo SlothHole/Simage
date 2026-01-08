@@ -35,7 +35,7 @@ import re
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
-from path_utils import resolve_repo_path
+from simage.path_utils import resolve_repo_path
 
 RE_MVID = re.compile(r"^modelVersionId:(\d+)$", re.IGNORECASE)
 

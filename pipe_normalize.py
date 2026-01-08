@@ -1,3 +1,19 @@
+def sha256_file_backup(path: str) -> Optional[str]:
+    """
+    Backup: Directly compute SHA256 for any file path, bypassing repo-relative logic.
+    """
+    try:
+        from pathlib import Path
+        abs_path = Path(path)
+        if not abs_path.exists():
+            return None
+        h = hashlib.sha256()
+        with open(abs_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return None
 """
 Run from: repository root (this directory)
 Example:
@@ -30,7 +46,7 @@ import sqlite3
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from path_utils import resolve_repo_path, resolve_repo_relative
+from simage.path_utils import resolve_repo_path, resolve_repo_relative
 
 
 # ---------- helpers ----------
@@ -48,7 +64,13 @@ def stable_id_for_path(path: str) -> str:
 
 def sha256_file(path: str) -> Optional[str]:
     try:
-        _rel, abs_path = resolve_repo_relative(path, allow_absolute=True)
+        import os
+        from pathlib import Path
+        # If file is inside repo, use resolve_repo_relative; else, use absolute path directly
+        if Path(path).is_absolute() and Path(path).exists():
+            abs_path = path
+        else:
+            _rel, abs_path = resolve_repo_relative(path, allow_absolute=True)
         h = hashlib.sha256()
         with open(abs_path, "rb") as f:
             for chunk in iter(lambda: f.read(1024 * 1024), b""):
