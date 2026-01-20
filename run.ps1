@@ -19,22 +19,23 @@ if (Test-Path $venvPython) {
 }
 
 function Ensure-Pip([string]$pythonExe) {
-	try {
-		& $pythonExe -m pip --version | Out-Null
+	& $pythonExe -m pip --version *> $null
+	if ($LASTEXITCODE -eq 0) {
 		return $true
-	} catch {
-		try {
-			& $pythonExe -m ensurepip --upgrade | Out-Null
-			& $pythonExe -m pip --version | Out-Null
-			return $true
-		} catch {
-			return $false
-		}
 	}
+	& $pythonExe -m ensurepip --upgrade *> $null
+	& $pythonExe -m pip --version *> $null
+	return ($LASTEXITCODE -eq 0)
 }
 
 # Install requirements if pip is available
-if (Ensure-Pip $py) {
+$pipOk = Ensure-Pip $py
+if (-not $pipOk -and $py -ne "python") {
+	Write-Warning "pip not available in .venv; falling back to system python."
+	$py = "python"
+	$pipOk = Ensure-Pip $py
+}
+if ($pipOk) {
 	& $py -m pip install -r simage\ui\requirements.txt
 } else {
 	Write-Warning "pip not available; skipping dependency install."
@@ -51,4 +52,15 @@ if (!(Test-Path $exifTool)) {
 & $py -m simage all --in out/exif_raw.jsonl --db out/images.db --schema simage/data/schema.sql --jsonl out/records.jsonl --csv out/records.csv
 
 # Launch UI
+& $py -c "import PySide6" *> $null
+if ($LASTEXITCODE -ne 0) {
+	if ($pipOk) {
+		& $py -m pip install -r simage\ui\requirements.txt
+		& $py -c "import PySide6" *> $null
+	}
+}
+if ($LASTEXITCODE -ne 0) {
+	Write-Error "PySide6 is not available. Install UI deps or fix pip, then rerun."
+	exit 1
+}
 & $py -m simage.ui.app
