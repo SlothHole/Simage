@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -38,10 +39,22 @@ class BatchTab(QWidget):
 
         self.info_label = QLabel("Select images in the Gallery tab, then apply batch actions here.")
         self.info_label.setWordWrap(True)
-        layout.addWidget(self.info_label)
+        info_row = QHBoxLayout()
+        info_row.addWidget(self.info_label)
+        info_row.addWidget(
+            self._help_button("Batch actions apply to the images selected in Gallery.")
+        )
+        info_row.addStretch(1)
+        layout.addLayout(info_row)
 
         self.selected_label = QLabel("Selected: 0")
-        layout.addWidget(self.selected_label)
+        selected_row = QHBoxLayout()
+        selected_row.addWidget(self.selected_label)
+        selected_row.addWidget(
+            self._help_button("Shows how many images are currently selected.")
+        )
+        selected_row.addStretch(1)
+        layout.addLayout(selected_row)
 
         self.selected_list = QListWidget()
         layout.addWidget(self.selected_list)
@@ -53,6 +66,9 @@ class BatchTab(QWidget):
         self.batch_tag_btn.clicked.connect(self.apply_batch_tags)
         tag_layout.addWidget(self.batch_tag_input)
         tag_layout.addWidget(self.batch_tag_btn)
+        tag_layout.addWidget(
+            self._help_button("Add tags to all selected images (comma-separated).")
+        )
         layout.addLayout(tag_layout)
 
         rename_layout = QHBoxLayout()
@@ -62,6 +78,9 @@ class BatchTab(QWidget):
         self.batch_rename_btn.clicked.connect(self.apply_batch_rename)
         rename_layout.addWidget(self.batch_rename_input)
         rename_layout.addWidget(self.batch_rename_btn)
+        rename_layout.addWidget(
+            self._help_button("Rename selected images with a base name and index.")
+        )
         layout.addLayout(rename_layout)
 
         move_layout = QHBoxLayout()
@@ -71,21 +90,42 @@ class BatchTab(QWidget):
         self.batch_move_btn.clicked.connect(self.apply_batch_move)
         move_layout.addWidget(self.batch_move_input)
         move_layout.addWidget(self.batch_move_btn)
+        move_layout.addWidget(
+            self._help_button("Move selected images to a target folder.")
+        )
         layout.addLayout(move_layout)
 
         actions_layout = QHBoxLayout()
         self.export_btn = QPushButton("Export Selected")
         self.export_btn.clicked.connect(self.export_selected)
         actions_layout.addWidget(self.export_btn)
+        actions_layout.addWidget(
+            self._help_button("Copy selected images to exported_images with JSON metadata.")
+        )
 
         self.import_btn = QPushButton("Import Folder")
         self.import_btn.clicked.connect(self.import_folder)
         actions_layout.addWidget(self.import_btn)
+        actions_layout.addWidget(
+            self._help_button("Import images from a folder into Input/.")
+        )
 
         self.refresh_btn = QPushButton("Refresh Pipeline")
         self.refresh_btn.clicked.connect(self.refresh_pipeline)
         actions_layout.addWidget(self.refresh_btn)
+        actions_layout.addWidget(
+            self._help_button("Run EXIF + full pipeline to refresh records and thumbnails.")
+        )
         layout.addLayout(actions_layout)
+
+    def _help_button(self, text):
+        btn = QToolButton()
+        btn.setText("?")
+        btn.setAutoRaise(True)
+        btn.setToolTip(text)
+        btn.setCursor(Qt.WhatsThisCursor)
+        btn.setFixedSize(16, 16)
+        return btn
 
     def set_selected_images(self, image_paths: List[str]) -> None:
         self.selected_images = image_paths

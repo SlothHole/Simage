@@ -65,6 +65,12 @@ class GalleryTab(QWidget):
         self.search_btn.clicked.connect(self.apply_search)
         search_layout.addWidget(self.search_input)
         search_layout.addWidget(self.search_btn)
+        search_layout.addWidget(
+            self._help_button(
+                "Search filenames and metadata. Use key:value for field search; "
+                "multiple terms are ANDed."
+            )
+        )
 
         self.tag_menu_btn = QToolButton()
         self.tag_menu_btn.setText("Filter Tags")
@@ -79,6 +85,11 @@ class GalleryTab(QWidget):
         tag_action.setDefaultWidget(self.tag_list)
         self.tag_menu.addAction(tag_action)
         search_layout.addWidget(self.tag_menu_btn)
+        search_layout.addWidget(
+            self._help_button(
+                "Filter by prompt tags. Checked tags must all be present to match."
+            )
+        )
 
         self.sort_combo = QComboBox()
         self.sort_combo.addItem("Sort: File Name", "file_name")
@@ -96,8 +107,22 @@ class GalleryTab(QWidget):
         self.sort_combo.addItem("Sort: Format", "format_hint")
         self.sort_combo.currentIndexChanged.connect(self.apply_sort)
         search_layout.addWidget(self.sort_combo)
+        search_layout.addWidget(
+            self._help_button("Sort the current results by the selected field.")
+        )
 
         grid_layout.addLayout(search_layout)
+
+        grid_header = QHBoxLayout()
+        grid_header.addWidget(QLabel("Thumbnails"))
+        grid_header.addWidget(
+            self._help_button(
+                "Thumbnail grid. Only images with existing originals and thumbnails are shown. "
+                "Use arrow keys to move selection."
+            )
+        )
+        grid_header.addStretch(1)
+        grid_layout.addLayout(grid_header)
 
         self.grid = ThumbnailGrid()
         self.grid.image_selected.connect(self.on_image_selected)
@@ -113,6 +138,13 @@ class GalleryTab(QWidget):
 
         preview_panel = QWidget()
         preview_layout = QVBoxLayout(preview_panel)
+        preview_header = QHBoxLayout()
+        preview_header.addWidget(QLabel("Preview"))
+        preview_header.addWidget(
+            self._help_button("Shows the selected image. Drag the splitter to resize.")
+        )
+        preview_header.addStretch(1)
+        preview_layout.addLayout(preview_header)
         self.image_preview = QLabel("No image selected")
         self.image_preview.setAlignment(Qt.AlignCenter)
         self.image_preview.setMinimumSize(256, 256)
@@ -125,8 +157,21 @@ class GalleryTab(QWidget):
         self.info_window.setReadOnly(True)
         self.info_window.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
+        info_panel = QWidget()
+        info_layout = QVBoxLayout(info_panel)
+        info_header = QHBoxLayout()
+        info_header.addWidget(QLabel("Metadata"))
+        info_header.addWidget(
+            self._help_button(
+                "Parsed metadata for the selected image. Fields are deduped and labeled."
+            )
+        )
+        info_header.addStretch(1)
+        info_layout.addLayout(info_header)
+        info_layout.addWidget(self.info_window)
+
         detail_splitter.addWidget(preview_panel)
-        detail_splitter.addWidget(self.info_window)
+        detail_splitter.addWidget(info_panel)
         detail_splitter.setSizes([600, 240])
 
         side_layout.addWidget(detail_splitter)
@@ -147,6 +192,15 @@ class GalleryTab(QWidget):
         self.selected_tags = set()
         self._build_tag_menu()
         self.update_grid()
+
+    def _help_button(self, text):
+        btn = QToolButton()
+        btn.setText("?")
+        btn.setAutoRaise(True)
+        btn.setToolTip(text)
+        btn.setCursor(Qt.WhatsThisCursor)
+        btn.setFixedSize(16, 16)
+        return btn
 
     def _compute_csv_columns(self, records):
         extra = sorted({k for r in records for k in r.keys() if not k.startswith("_")} - set(CSV_COLUMNS))

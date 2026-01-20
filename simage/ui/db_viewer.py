@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QSplitter,
     QAbstractItemView,
+    QToolButton,
 )
 
 from simage.utils.paths import resolve_repo_path
@@ -51,6 +52,9 @@ class DatabaseViewerTab(QWidget):
         conn_row.addWidget(browse_btn)
         conn_row.addWidget(connect_btn)
         conn_row.addWidget(disconnect_btn)
+        conn_row.addWidget(
+            self._help_button("Select a SQLite database and connect in read-only mode.")
+        )
         layout.addLayout(conn_row)
 
         self.status_label = QLabel("Not connected.")
@@ -73,6 +77,11 @@ class DatabaseViewerTab(QWidget):
         table_row.addWidget(load_table_btn)
         table_row.addWidget(describe_btn)
         table_row.addWidget(count_btn)
+        table_row.addWidget(
+            self._help_button(
+                "Pick a table, load rows, describe columns, or get a row count."
+            )
+        )
         table_row.addStretch(1)
         layout.addLayout(table_row)
 
@@ -80,11 +89,27 @@ class DatabaseViewerTab(QWidget):
         editor_split = QSplitter(Qt.Horizontal)
         self.sql_input = QPlainTextEdit()
         self.sql_input.setPlaceholderText("Write SQL here. Example: SELECT * FROM images LIMIT 50;")
-        editor_split.addWidget(self.sql_input)
+        sql_panel = QWidget()
+        sql_layout = QVBoxLayout(sql_panel)
+        sql_header = QHBoxLayout()
+        sql_header.addWidget(QLabel("SQL Editor"))
+        sql_header.addWidget(
+            self._help_button("Write SQL to execute against the connected database.")
+        )
+        sql_header.addStretch(1)
+        sql_layout.addLayout(sql_header)
+        sql_layout.addWidget(self.sql_input)
+        editor_split.addWidget(sql_panel)
 
         history_panel = QWidget()
         history_layout = QVBoxLayout(history_panel)
-        history_layout.addWidget(QLabel("History"))
+        history_header = QHBoxLayout()
+        history_header.addWidget(QLabel("History"))
+        history_header.addWidget(
+            self._help_button("Recent SQL commands. Double-click to load.")
+        )
+        history_header.addStretch(1)
+        history_layout.addLayout(history_header)
         self.history_list = QListWidget()
         self.history_list.itemDoubleClicked.connect(self.load_history_item)
         history_layout.addWidget(self.history_list)
@@ -113,6 +138,11 @@ class DatabaseViewerTab(QWidget):
         run_row.addWidget(copy_row_btn)
         run_row.addWidget(clear_btn)
         run_row.addWidget(run_btn)
+        run_row.addWidget(
+            self._help_button(
+                "Run the SQL. Export, copy, or clear results as needed."
+            )
+        )
         layout.addLayout(run_row)
 
         # Results table
@@ -125,9 +155,28 @@ class DatabaseViewerTab(QWidget):
 
         vertical_split = QSplitter(Qt.Vertical)
         vertical_split.addWidget(editor_split)
-        vertical_split.addWidget(self.table)
+        results_panel = QWidget()
+        results_layout = QVBoxLayout(results_panel)
+        results_header = QHBoxLayout()
+        results_header.addWidget(QLabel("Results"))
+        results_header.addWidget(
+            self._help_button("Query results. Click headers to sort.")
+        )
+        results_header.addStretch(1)
+        results_layout.addLayout(results_header)
+        results_layout.addWidget(self.table)
+        vertical_split.addWidget(results_panel)
         vertical_split.setSizes([240, 520])
         layout.addWidget(vertical_split)
+
+    def _help_button(self, text: str) -> QToolButton:
+        btn = QToolButton()
+        btn.setText("?")
+        btn.setAutoRaise(True)
+        btn.setToolTip(text)
+        btn.setCursor(Qt.WhatsThisCursor)
+        btn.setFixedSize(16, 16)
+        return btn
 
     def _resolve_db_path(self, path_str: str) -> str:
         raw = Path(path_str)

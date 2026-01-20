@@ -1,6 +1,6 @@
 # Simage
 
-Local pipeline for extracting AI image metadata and normalizing into SQLite.
+Local pipeline for extracting AI image metadata and normalizing into SQLite with a full UI.
 
 ## Layout
 
@@ -13,7 +13,7 @@ Local pipeline for extracting AI image metadata and normalizing into SQLite.
 - simage/utils/paths.py: repo-root path helpers
 - simage/data/schema.sql: SQLite schema
 - simage/ui/: PySide UI
-- run.ps1, run.cmd, run.sh: convenience runners
+- run.ps1, run.cmd, run.sh: convenience runners (optional)
 - Input/: source images
 - out/: generated outputs
 
@@ -24,6 +24,14 @@ Local pipeline for extracting AI image metadata and normalizing into SQLite.
 - Optional UI deps: simage/ui/requirements.txt
 
 ## Run
+
+Preferred: launch the UI and use the built-in buttons for setup and pipeline actions.
+
+```powershell
+python -m simage.ui.app
+```
+
+Optional convenience runners:
 
 ```powershell
 .\run.ps1
@@ -38,7 +46,7 @@ chmod +x ./run.sh
 ./run.sh
 ```
 
-## Pipeline
+## Pipeline (CLI, optional)
 
 1) Extract EXIF JSONL
 
@@ -84,11 +92,13 @@ python -m simage.ui.app
 ```
 
 UI features:
-- Import: copy images recursively from a chosen folder into `Input/`.
-- Refresh: reruns EXIF + full pipeline for newly imported images.
-- Gallery: keeps thumbnails for missing originals (missing images still show).
-- DB Viewer tab: run read-only SQL against `out/images.db`.
+- Gallery & Search: fast thumbnail grid, metadata preview, keyboard navigation, search (including `key:value`), tag filter dropdown, and sort options.
+- Tag Images: manage tags, rename tags, add tags to selected images, and maintain a custom tag list (`out/tag_list.json`).
+- Batch Processing: import folders into `Input/`, batch tag/rename/move, export metadata JSON, and refresh the pipeline.
+- Settings: create `.venv`, install dependencies, run EXIF/ingest/resources/resolve/all, and restart the UI.
+- DB Viewer: connect/browse DB, table list tools, SQL editor with history, export to CSV, and copy rows/cells.
 - Thumbnail cache: stored in `/.thumbnails` (contents ignored by git).
+- Edit Images / Full Image Viewer: placeholders for future tools.
 
 ## Tests
 

@@ -56,6 +56,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QSplitter,
     QSizePolicy,
+    QToolButton,
 )
 
 class TagTab(QWidget):
@@ -75,7 +76,15 @@ class TagTab(QWidget):
         self.setLayout(layout)
 
         self.info_label = QLabel("Manage tags and apply them to selected images.")
-        layout.addWidget(self.info_label)
+        info_row = QHBoxLayout()
+        info_row.addWidget(self.info_label)
+        info_row.addWidget(
+            self._help_button(
+                "Use this tab to create tags, rename tags, and apply tags to images."
+            )
+        )
+        info_row.addStretch(1)
+        layout.addLayout(info_row)
 
         top_splitter = QSplitter(Qt.Horizontal)
         bottom_splitter = QSplitter(Qt.Horizontal)
@@ -90,7 +99,12 @@ class TagTab(QWidget):
         # Image list
         image_panel = QWidget()
         image_layout = QVBoxLayout(image_panel)
-        image_layout.addWidget(QLabel("Image list"))
+        image_layout.addWidget(
+            self._header(
+                "Image list",
+                "All images from records.csv. Select images to view or edit tags.",
+            )
+        )
         self.image_list = QListWidget()
         self.image_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self.image_list.itemSelectionChanged.connect(self._on_image_selection_changed)
@@ -100,7 +114,12 @@ class TagTab(QWidget):
         # Current tags
         current_panel = QWidget()
         current_layout = QVBoxLayout(current_panel)
-        current_layout.addWidget(QLabel("Current tags"))
+        current_layout.addWidget(
+            self._header(
+                "Current tags",
+                "Tags currently assigned to the selected images.",
+            )
+        )
         self.current_tags_list = QListWidget()
         current_layout.addWidget(self.current_tags_list)
         top_splitter.addWidget(current_panel)
@@ -108,7 +127,12 @@ class TagTab(QWidget):
         # Create new tag
         new_panel = QWidget()
         new_layout = QVBoxLayout(new_panel)
-        new_layout.addWidget(QLabel("Create New Tag"))
+        new_layout.addWidget(
+            self._header(
+                "Create New Tag",
+                "Create new custom tags, then save them to the tag list.",
+            )
+        )
         self.new_tag_input = QLineEdit()
         self.new_tag_input.setPlaceholderText("New tag name")
         new_layout.addWidget(self.new_tag_input)
@@ -122,7 +146,12 @@ class TagTab(QWidget):
         # Confirm save new tags
         confirm_new_panel = QWidget()
         confirm_new_layout = QVBoxLayout(confirm_new_panel)
-        confirm_new_layout.addWidget(QLabel("Confirm save adding new created tags to tag List"))
+        confirm_new_layout.addWidget(
+            self._header(
+                "Confirm save adding new created tags to tag List",
+                "Save queued new tags into the custom tag list.",
+            )
+        )
         self.save_new_tags_btn = QPushButton("Save New Tags")
         self.save_new_tags_btn.clicked.connect(self._save_new_tags)
         confirm_new_layout.addWidget(self.save_new_tags_btn)
@@ -133,7 +162,12 @@ class TagTab(QWidget):
         # Selected images
         selected_panel = QWidget()
         selected_layout = QVBoxLayout(selected_panel)
-        selected_layout.addWidget(QLabel("Selected Images"))
+        selected_layout.addWidget(
+            self._header(
+                "Selected Images",
+                "Images that will receive any queued tags.",
+            )
+        )
         self.selected_images_list = QListWidget()
         selected_layout.addWidget(self.selected_images_list)
         bottom_splitter.addWidget(selected_panel)
@@ -141,7 +175,12 @@ class TagTab(QWidget):
         # Add tag
         add_panel = QWidget()
         add_layout = QVBoxLayout(add_panel)
-        add_layout.addWidget(QLabel("Add Tag"))
+        add_layout.addWidget(
+            self._header(
+                "Add Tag",
+                "Choose tags to apply. Queue them before confirming.",
+            )
+        )
         self.add_tag_list = QListWidget()
         self.add_tag_list.setSelectionMode(QAbstractItemView.ExtendedSelection)
         add_layout.addWidget(self.add_tag_list)
@@ -153,7 +192,12 @@ class TagTab(QWidget):
         # Added tags
         added_panel = QWidget()
         added_layout = QVBoxLayout(added_panel)
-        added_layout.addWidget(QLabel("Added Tags"))
+        added_layout.addWidget(
+            self._header(
+                "Added Tags",
+                "Tags queued to apply to the selected images.",
+            )
+        )
         self.added_tags_list = QListWidget()
         added_layout.addWidget(self.added_tags_list)
         self.clear_added_btn = QPushButton("Clear Added Tags")
@@ -164,7 +208,12 @@ class TagTab(QWidget):
         # Edit existing tag
         edit_panel = QWidget()
         edit_layout = QVBoxLayout(edit_panel)
-        edit_layout.addWidget(QLabel("Edit Existing tag"))
+        edit_layout.addWidget(
+            self._header(
+                "Edit Existing tag",
+                "Rename a tag everywhere it appears.",
+            )
+        )
         self.edit_tag_list = QListWidget()
         self.edit_tag_list.setSelectionMode(QAbstractItemView.SingleSelection)
         edit_layout.addWidget(self.edit_tag_list)
@@ -179,7 +228,12 @@ class TagTab(QWidget):
         # Edited tags
         edited_panel = QWidget()
         edited_layout = QVBoxLayout(edited_panel)
-        edited_layout.addWidget(QLabel("Edited Tags"))
+        edited_layout.addWidget(
+            self._header(
+                "Edited Tags",
+                "Queued tag renames pending save.",
+            )
+        )
         self.edited_tags_list = QListWidget()
         edited_layout.addWidget(self.edited_tags_list)
         bottom_splitter.addWidget(edited_panel)
@@ -187,11 +241,21 @@ class TagTab(QWidget):
         # Confirm panel
         confirm_panel = QWidget()
         confirm_layout = QVBoxLayout(confirm_panel)
-        confirm_layout.addWidget(QLabel("Confirm saved edited tags."))
+        confirm_layout.addWidget(
+            self._header(
+                "Confirm saved edited tags.",
+                "Apply queued tag renames to all records.",
+            )
+        )
         self.save_edits_btn = QPushButton("Save Edited Tags")
         self.save_edits_btn.clicked.connect(self._apply_tag_edits)
         confirm_layout.addWidget(self.save_edits_btn)
-        confirm_layout.addWidget(QLabel("Confirm adding tags to images"))
+        confirm_layout.addWidget(
+            self._header(
+                "Confirm adding tags to images",
+                "Apply queued tags to the selected images.",
+            )
+        )
         self.apply_tags_btn = QPushButton("Apply Tags to Selected Images")
         self.apply_tags_btn.clicked.connect(self._apply_tags_to_selected)
         confirm_layout.addWidget(self.apply_tags_btn)
@@ -202,6 +266,24 @@ class TagTab(QWidget):
 
         self._refresh_image_list()
         self._refresh_tag_lists()
+
+    def _help_button(self, text):
+        btn = QToolButton()
+        btn.setText("?")
+        btn.setAutoRaise(True)
+        btn.setToolTip(text)
+        btn.setCursor(Qt.WhatsThisCursor)
+        btn.setFixedSize(16, 16)
+        return btn
+
+    def _header(self, title, tip):
+        row = QHBoxLayout()
+        row.addWidget(QLabel(title))
+        row.addWidget(self._help_button(tip))
+        row.addStretch(1)
+        widget = QWidget()
+        widget.setLayout(row)
+        return widget
 
     def _load_records(self):
         if not os.path.exists(self.csv_path):

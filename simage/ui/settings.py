@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -34,15 +35,24 @@ class SettingsTab(QWidget):
 
         self.create_venv_btn = QPushButton("Create .venv (if missing)")
         self.create_venv_btn.clicked.connect(self.create_venv)
-        env_layout.addWidget(self.create_venv_btn)
+        env_layout.addLayout(self._with_help(
+            self.create_venv_btn,
+            "Create a local virtual environment in .venv.",
+        ))
 
         self.install_deps_btn = QPushButton("Install or update UI dependencies")
         self.install_deps_btn.clicked.connect(self.install_dependencies)
-        env_layout.addWidget(self.install_deps_btn)
+        env_layout.addLayout(self._with_help(
+            self.install_deps_btn,
+            "Install UI requirements from simage/ui/requirements.txt.",
+        ))
 
         self.restart_ui_btn = QPushButton("Restart UI")
         self.restart_ui_btn.clicked.connect(self.restart_ui)
-        env_layout.addWidget(self.restart_ui_btn)
+        env_layout.addLayout(self._with_help(
+            self.restart_ui_btn,
+            "Restart the UI using the current Python environment.",
+        ))
 
         layout.addWidget(env_group)
 
@@ -53,34 +63,56 @@ class SettingsTab(QWidget):
         self.run_exif_btn = QPushButton("Run EXIF scan")
         self.run_exif_btn.clicked.connect(self.run_exif_scan)
         row1.addWidget(self.run_exif_btn)
+        row1.addWidget(self._help_button("Extract raw EXIF metadata into out/exif_raw.jsonl."))
 
         self.run_ingest_btn = QPushButton("Run ingest")
         self.run_ingest_btn.clicked.connect(self.run_ingest)
         row1.addWidget(self.run_ingest_btn)
+        row1.addWidget(self._help_button("Normalize EXIF into records.csv/jsonl and images.db."))
         pipeline_layout.addLayout(row1)
 
         row2 = QHBoxLayout()
         self.run_resources_btn = QPushButton("Run resources")
         self.run_resources_btn.clicked.connect(self.run_resources)
         row2.addWidget(self.run_resources_btn)
+        row2.addWidget(self._help_button("Parse workflow_json into the resources table."))
 
         self.run_resolve_btn = QPushButton("Run resolve")
         self.run_resolve_btn.clicked.connect(self.run_resolve)
         row2.addWidget(self.run_resolve_btn)
+        row2.addWidget(self._help_button("Resolve resource references using local mappings."))
         pipeline_layout.addLayout(row2)
 
         row3 = QHBoxLayout()
         self.run_all_btn = QPushButton("Run all (ingest + resources + resolve)")
         self.run_all_btn.clicked.connect(self.run_all)
         row3.addWidget(self.run_all_btn)
+        row3.addWidget(self._help_button("Run ingest, resources, and resolve in sequence."))
 
         self.refresh_pipeline_btn = QPushButton("Refresh pipeline (EXIF + all)")
         self.refresh_pipeline_btn.clicked.connect(self.refresh_pipeline)
         row3.addWidget(self.refresh_pipeline_btn)
+        row3.addWidget(self._help_button("Run EXIF scan then the full pipeline."))
         pipeline_layout.addLayout(row3)
 
         layout.addWidget(pipeline_group)
         layout.addStretch(1)
+
+    def _help_button(self, text: str) -> QToolButton:
+        btn = QToolButton()
+        btn.setText("?")
+        btn.setAutoRaise(True)
+        btn.setToolTip(text)
+        btn.setCursor(Qt.WhatsThisCursor)
+        btn.setFixedSize(16, 16)
+        return btn
+
+    def _with_help(self, widget: QWidget, text: str) -> QHBoxLayout:
+        row = QHBoxLayout()
+        row.addWidget(widget)
+        row.addWidget(self._help_button(text))
+        row.addStretch(1)
+        return row
 
     def _repo_root(self) -> Path:
         return resolve_repo_path(".", must_exist=True, allow_absolute=False)
