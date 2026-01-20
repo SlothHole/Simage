@@ -1,0 +1,1 @@
+// Contents moved from exif_dump.py
