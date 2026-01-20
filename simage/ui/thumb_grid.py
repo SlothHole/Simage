@@ -1,5 +1,5 @@
 """
-Fast, virtualized thumbnail grid widget for SimageUI.
+Fast, virtualized thumbnail grid widget for Simage UI.
 """
 
 

@@ -1,9 +1,6 @@
-import pytest
 import sqlite3
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from simage.export_wildcards import table_exists, apply_filters
+
+from simage.core.wildcards import table_exists, apply_filters
 
 def test_table_exists(tmp_path):
     db_path = tmp_path / "test.db"

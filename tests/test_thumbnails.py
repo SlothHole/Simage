@@ -1,6 +1,6 @@
 import os
 import tempfile
-from SimageUI.thumbnailer import ensure_thumbnail, THUMB_DIR
+from simage.ui.thumbnails import ensure_thumbnail, THUMB_DIR
 from PIL import Image
 
 def test_ensure_thumbnail_creates_file():

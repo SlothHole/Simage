@@ -1,7 +1,6 @@
-import pytest
 import os
 import tempfile
-from simage.pipe_normalize import sha256_file_backup
+from simage.core.ingest import sha256_file_backup
 
 def test_sha256_file_backup():
     with tempfile.NamedTemporaryFile(delete=False) as tmp:

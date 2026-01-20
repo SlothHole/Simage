@@ -1,5 +1,5 @@
-import sys
 import os
+import sys
 
-# Add SimageUI to sys.path for test discovery
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'SimageUI')))
+# Ensure repo root is on sys.path for test discovery
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))

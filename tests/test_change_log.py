@@ -1,10 +1,8 @@
-
-import os
 import json
+import os
 import tempfile
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../SimageUI')))
-from change_logger import ChangeLogger
+
+from simage.ui.change_log import ChangeLogger
 
 def test_change_logger_log_and_recover():
     # Use a temp log file

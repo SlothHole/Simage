@@ -1,8 +1,4 @@
-import pytest
-import sys
-import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from simage.pipe_parse import as_float, classify_urn
+from simage.core.resources import as_float, classify_urn
 
 def test_as_float_valid():
     assert as_float('1.23') == 1.23

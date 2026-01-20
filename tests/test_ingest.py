@@ -1,10 +1,15 @@
-import pytest
 import os
-import sqlite3
 import tempfile
-import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from simage.pipe_normalize import utc_now_iso, stable_id_for_path, sha256_file, is_probably_json, safe_json_loads, first_present, clean_ws
+
+from simage.core.ingest import (
+    utc_now_iso,
+    stable_id_for_path,
+    sha256_file,
+    is_probably_json,
+    safe_json_loads,
+    first_present,
+    clean_ws,
+)
 
 def test_utc_now_iso_format():
     result = utc_now_iso()
