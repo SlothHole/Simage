@@ -1,6 +1,7 @@
 """
 Thumbnailer: Handles high-quality thumbnail generation and caching for Simage UI.
 """
+import hashlib
 import os
 from PIL import Image
 
@@ -11,6 +12,14 @@ THUMB_QUALITY = 90
 # Central thumbnail directory at repo root
 THUMB_DIR = str(resolve_repo_path(".thumbnails", must_exist=False, allow_absolute=False))
 
+def thumbnail_path_for_source(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
+    base = os.path.basename(img_path)
+    repo_root = str(resolve_repo_path(".", allow_absolute=False))
+    rel_path = os.path.relpath(img_path, repo_root)
+    hash_part = hashlib.md5(rel_path.encode("utf-8")).hexdigest()[:8]
+    thumb_name = f"{os.path.splitext(base)[0]}_{hash_part}.jpg"
+    return os.path.join(thumb_dir, thumb_name)
+
 
 def ensure_thumbnail(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
     """
@@ -19,15 +28,7 @@ def ensure_thumbnail(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
     """
     if not os.path.exists(thumb_dir):
         os.makedirs(thumb_dir, exist_ok=True)
-    # Use a unique name for the thumbnail to avoid collisions (e.g., hash or relpath)
-    base = os.path.basename(img_path)
-    # Optionally, use a hash or relpath for uniqueness
-    import hashlib
-    repo_root = str(resolve_repo_path(".", allow_absolute=False))
-    rel_path = os.path.relpath(img_path, repo_root)
-    hash_part = hashlib.md5(rel_path.encode("utf-8")).hexdigest()[:8]
-    thumb_name = f"{os.path.splitext(base)[0]}_{hash_part}.jpg"
-    thumb_path = os.path.join(thumb_dir, thumb_name)
+    thumb_path = thumbnail_path_for_source(img_path, thumb_dir)
     if os.path.exists(thumb_path):
         return thumb_path
     try:

@@ -24,7 +24,7 @@ import argparse
 import sys
 from typing import Callable, List
 
-from simage.utils.paths import resolve_repo_path
+from simage.utils.paths import resolve_repo_relative
 
 
 def _run_module_main(main_func: Callable[[], None], argv: List[str]) -> None:
@@ -38,6 +38,11 @@ def _run_module_main(main_func: Callable[[], None], argv: List[str]) -> None:
         main_func()
     finally:
         sys.argv = old
+
+
+def _resolve_rel_path(path_str: str, *, must_exist: bool = False) -> str:
+    rel, _abs = resolve_repo_relative(path_str, must_exist=must_exist, allow_absolute=False)
+    return str(rel)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,39 +93,39 @@ def main() -> int:
     from simage.core import resolve
 
     if args.cmd == "ingest":
-        in_jsonl = resolve_repo_path(args.in_jsonl, must_exist=True, allow_absolute=False)
-        db_path = resolve_repo_path(args.db_path, allow_absolute=False)
-        schema_path = resolve_repo_path(args.schema_path, must_exist=True, allow_absolute=False)
-        out_jsonl = resolve_repo_path(args.out_jsonl, allow_absolute=False)
-        out_csv = resolve_repo_path(args.out_csv, allow_absolute=False)
+        in_jsonl = _resolve_rel_path(args.in_jsonl, must_exist=True)
+        db_path = _resolve_rel_path(args.db_path)
+        schema_path = _resolve_rel_path(args.schema_path, must_exist=True)
+        out_jsonl = _resolve_rel_path(args.out_jsonl)
+        out_csv = _resolve_rel_path(args.out_csv)
         _run_module_main(
             ingest.main,
             [
                 "--in",
-                str(in_jsonl),
+                in_jsonl,
                 "--db",
-                str(db_path),
+                db_path,
                 "--schema",
-                str(schema_path),
+                schema_path,
                 "--jsonl",
-                str(out_jsonl),
+                out_jsonl,
                 "--csv",
-                str(out_csv),
+                out_csv,
             ],
         )
         return 0
 
     if args.cmd == "resources":
-        db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
-        argv = ["--db", str(db_path)]
+        db_path = _resolve_rel_path(args.db, must_exist=True)
+        argv = ["--db", db_path]
         if args.limit and args.limit > 0:
             argv += ["--limit", str(args.limit)]
         _run_module_main(resources.main, argv)
         return 0
 
     if args.cmd == "resolve":
-        db_path = resolve_repo_path(args.db, must_exist=True, allow_absolute=False)
-        argv = ["--db", str(db_path)]
+        db_path = _resolve_rel_path(args.db, must_exist=True)
+        argv = ["--db", db_path]
         if args.import_json:
             argv += ["--import-json", args.import_json]
         if args.import_map:
@@ -131,32 +136,32 @@ def main() -> int:
         return 0
 
     if args.cmd == "all":
-        in_jsonl = resolve_repo_path(args.in_jsonl, must_exist=True, allow_absolute=False)
-        db_path = resolve_repo_path(args.db_path, allow_absolute=False)
-        schema_path = resolve_repo_path(args.schema_path, must_exist=True, allow_absolute=False)
-        out_jsonl = resolve_repo_path(args.out_jsonl, allow_absolute=False)
-        out_csv = resolve_repo_path(args.out_csv, allow_absolute=False)
+        in_jsonl = _resolve_rel_path(args.in_jsonl, must_exist=True)
+        db_path = _resolve_rel_path(args.db_path)
+        schema_path = _resolve_rel_path(args.schema_path, must_exist=True)
+        out_jsonl = _resolve_rel_path(args.out_jsonl)
+        out_csv = _resolve_rel_path(args.out_csv)
         _run_module_main(
             ingest.main,
             [
                 "--in",
-                str(in_jsonl),
+                in_jsonl,
                 "--db",
-                str(db_path),
+                db_path,
                 "--schema",
-                str(schema_path),
+                schema_path,
                 "--jsonl",
-                str(out_jsonl),
+                out_jsonl,
                 "--csv",
-                str(out_csv),
+                out_csv,
             ],
         )
         _run_module_main(
             resources.main,
-            ["--db", str(db_path)] + (["--limit", str(args.limit)] if args.limit and args.limit > 0 else []),
+            ["--db", db_path] + (["--limit", str(args.limit)] if args.limit and args.limit > 0 else []),
         )
 
-        argv = ["--db", str(db_path)]
+        argv = ["--db", db_path]
         if args.import_json:
             argv += ["--import-json", args.import_json]
         if args.import_map:

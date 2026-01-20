@@ -3,7 +3,11 @@ Gallery/search tab for Simage UI.
 Fast, scrollable, async thumbnail grid for large image sets.
 """
 
+import csv
+import json
 import os
+import sqlite3
+import sys
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -16,12 +20,34 @@ from PySide6.QtWidgets import (
     QFrame,
     QLineEdit,
     QPushButton,
+    QFileDialog,
+    QMessageBox,
 )
 from PySide6.QtCore import Qt
 
 from simage.utils.paths import resolve_repo_path
 from .thumb_grid import ThumbnailGrid
 from .record_filter import load_records, filter_records, filter_by_tags
+from .scanner import IMG_EXTS
+from .thumbnails import THUMB_DIR, ensure_thumbnail, thumbnail_path_for_source
+
+CSV_COLUMNS = [
+    "id",
+    "source_file",
+    "file_name",
+    "ext",
+    "width",
+    "height",
+    "format_hint",
+    "model",
+    "sampler",
+    "scheduler",
+    "steps",
+    "cfg_scale",
+    "seed",
+    "prompt",
+    "negative_prompt",
+]
 class GalleryTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -83,6 +109,14 @@ class GalleryTab(QWidget):
         self.export_btn.clicked.connect(self.export_selected)
         batch_layout.addWidget(self.export_btn)
 
+        self.import_btn = QPushButton("Import Folder")
+        self.import_btn.clicked.connect(self.import_folder)
+        batch_layout.addWidget(self.import_btn)
+
+        self.refresh_btn = QPushButton("Refresh Pipeline")
+        self.refresh_btn.clicked.connect(self.refresh_pipeline)
+        batch_layout.addWidget(self.refresh_btn)
+
         grid_layout.addLayout(batch_layout)
 
         self.grid = ThumbnailGrid()
@@ -118,7 +152,98 @@ class GalleryTab(QWidget):
         self.all_records = load_records(self.csv_path)
         self.filtered_records = self.all_records
         self.selected_images = []
+        self.thumb_cache = {}
         self.update_grid()
+
+    def _record_key(self, rec):
+        return rec.get("source_file") or rec.get("file_name") or ""
+
+    def _record_image_path(self, rec):
+        src = rec.get("source_file")
+        if isinstance(src, str) and src:
+            return str(resolve_repo_path(src, must_exist=False, allow_absolute=False))
+        name = rec.get("file_name")
+        if isinstance(name, str) and name:
+            return str(resolve_repo_path(os.path.join("Input", name), must_exist=False, allow_absolute=False))
+        return ""
+
+    def _thumbnail_path_for_record(self, rec):
+        img_path = self._record_image_path(rec)
+        if not img_path:
+            return ""
+        return thumbnail_path_for_source(img_path, THUMB_DIR)
+
+    def _thumb_for_record(self, rec):
+        key = self._record_key(rec)
+        if key in self.thumb_cache:
+            return self.thumb_cache[key]
+        img_path = self._record_image_path(rec)
+        if img_path and os.path.exists(img_path):
+            thumb = ensure_thumbnail(img_path, THUMB_DIR)
+        else:
+            thumb = self._thumbnail_path_for_record(rec)
+            if not os.path.exists(thumb):
+                thumb = ""
+        self.thumb_cache[key] = thumb
+        return thumb
+
+    def _load_jsonl(self, path):
+        if not os.path.exists(path):
+            return []
+        out = []
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    out.append(json.loads(line))
+                except Exception:
+                    continue
+        return out
+
+    def _write_jsonl(self, path, records):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            for rec in records:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    def _write_csv(self, path, records):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+            w.writeheader()
+            for rec in records:
+                row = {c: rec.get(c) for c in CSV_COLUMNS}
+                w.writerow(row)
+
+    def _delete_missing_records(self, records):
+        for rec in records:
+            thumb = self._thumbnail_path_for_record(rec)
+            if thumb and os.path.exists(thumb):
+                try:
+                    os.remove(thumb)
+                except Exception:
+                    pass
+
+        db_path = resolve_repo_path("out/images.db", must_exist=False, allow_absolute=False)
+        if not db_path.exists():
+            return
+        try:
+            conn = sqlite3.connect(db_path)
+            conn.execute("PRAGMA foreign_keys=ON;")
+            for rec in records:
+                src = rec.get("source_file")
+                if src:
+                    conn.execute("DELETE FROM images WHERE source_file = ?", (src,))
+                else:
+                    rec_id = rec.get("id")
+                    if rec_id:
+                        conn.execute("DELETE FROM images WHERE id = ?", (rec_id,))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
     def apply_sort(self):
         key = self.sort_input.text().strip()
         if not key:
@@ -132,9 +257,7 @@ class GalleryTab(QWidget):
         self.update_grid()
 
     def export_selected(self):
-        import json
         import shutil
-        from .thumbnails import ensure_thumbnail, THUMB_DIR
         if not self.selected_images:
             return
         export_dir = "exported_images"
@@ -152,6 +275,137 @@ class GalleryTab(QWidget):
                     json.dump(rec, f, indent=2)
             # Ensure thumbnail remains in .thumbnails (archive)
             ensure_thumbnail(img_path, THUMB_DIR)
+
+    def import_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Select Folder to Import")
+        if not folder:
+            return
+        input_dir = resolve_repo_path("Input", must_exist=False, allow_absolute=False)
+        os.makedirs(input_dir, exist_ok=True)
+
+        imported = 0
+        skipped = 0
+        for root, _dirs, files in os.walk(folder):
+            for name in files:
+                ext = os.path.splitext(name)[1].lower()
+                if ext not in IMG_EXTS:
+                    continue
+                src = os.path.join(root, name)
+                base, ext = os.path.splitext(name)
+                dest = os.path.join(input_dir, name)
+                if os.path.exists(dest):
+                    i = 1
+                    while True:
+                        candidate = os.path.join(input_dir, f"{base}_{i}{ext}")
+                        if not os.path.exists(candidate):
+                            dest = candidate
+                            break
+                        i += 1
+                try:
+                    import shutil
+                    shutil.copy2(src, dest)
+                    imported += 1
+                except Exception:
+                    skipped += 1
+
+        QMessageBox.information(
+            self,
+            "Import Complete",
+            f"Imported {imported} file(s) into Input. Skipped {skipped} file(s).",
+        )
+
+    def refresh_pipeline(self):
+        old_records = load_records(self.csv_path)
+        old_jsonl_path = str(resolve_repo_path("out/records.jsonl", must_exist=False, allow_absolute=False))
+        old_jsonl = self._load_jsonl(old_jsonl_path)
+        try:
+            import subprocess
+            repo_root = resolve_repo_path(".", must_exist=True, allow_absolute=False)
+            exiftool_candidates = [
+                resolve_repo_path("exiftool-13.45_64/ExifTool.exe", must_exist=False, allow_absolute=False),
+                resolve_repo_path("exiftool-13.45_64/exiftool", must_exist=False, allow_absolute=False),
+            ]
+            exiftool_path = next((p for p in exiftool_candidates if p.exists()), None)
+            exif_args = [
+                sys.executable,
+                "-m",
+                "simage.core.exif",
+                "--input",
+                "Input",
+                "--out",
+                "out/exif_raw.jsonl",
+            ]
+            if exiftool_path:
+                exif_args += ["--exiftool", str(exiftool_path)]
+            subprocess.run(
+                exif_args,
+                check=True,
+                cwd=str(repo_root),
+            )
+            subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "simage",
+                    "all",
+                    "--in",
+                    "out/exif_raw.jsonl",
+                    "--db",
+                    "out/images.db",
+                    "--schema",
+                    "simage/data/schema.sql",
+                    "--jsonl",
+                    "out/records.jsonl",
+                    "--csv",
+                    "out/records.csv",
+                ],
+                check=True,
+                cwd=str(repo_root),
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Pipeline Failed", f"Pipeline failed: {exc}")
+            return
+
+        new_records = load_records(self.csv_path)
+        new_jsonl_path = str(resolve_repo_path("out/records.jsonl", must_exist=False, allow_absolute=False))
+        new_jsonl = self._load_jsonl(new_jsonl_path)
+
+        old_map = {self._record_key(r): r for r in old_records if self._record_key(r)}
+        new_keys = {self._record_key(r) for r in new_records if self._record_key(r)}
+        missing_records = [old_map[k] for k in old_map if k not in new_keys]
+
+        if missing_records:
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Warning)
+            msg.setWindowTitle("Missing Images")
+            msg.setText(f"{len(missing_records)} image(s) are missing from Input.")
+            msg.setInformativeText("Delete their info + thumbnails, or keep them for reimport later?")
+            delete_btn = msg.addButton("Delete", QMessageBox.DestructiveRole)
+            keep_btn = msg.addButton("Keep for Later", QMessageBox.AcceptRole)
+            msg.setDefaultButton(keep_btn)
+            msg.exec()
+
+            if msg.clickedButton() == delete_btn:
+                self._delete_missing_records(missing_records)
+            else:
+                merged_records = list(new_records)
+                merged_records.extend(missing_records)
+                self._write_csv(self.csv_path, merged_records)
+
+                old_jsonl_map = {self._record_key(r): r for r in old_jsonl if self._record_key(r)}
+                merged_jsonl = list(new_jsonl)
+                for rec in missing_records:
+                    key = self._record_key(rec)
+                    merged_jsonl.append(old_jsonl_map.get(key, rec))
+                self._write_jsonl(new_jsonl_path, merged_jsonl)
+
+                new_records = load_records(self.csv_path)
+
+        self.all_records = new_records
+        self.filtered_records = self.all_records
+        self.thumb_cache = {}
+        self.update_grid()
+        QMessageBox.information(self, "Pipeline Complete", "Records and thumbnails refreshed.")
 
     def on_images_selected(self, image_paths):
         self.selected_images = image_paths
@@ -229,10 +483,17 @@ class GalleryTab(QWidget):
         self.update_grid()
 
     def update_grid(self):
-        # Show only filtered images in the grid
-        file_names = [rec["file_name"] for rec in self.filtered_records if "file_name" in rec]
-        # Patch: ThumbnailGrid expects folder, but we can set thumbs directly for now
-        self.grid.thumbs = [os.path.join(self.grid.folder, f) for f in file_names]
+        thumbs = []
+        images = []
+        for rec in self.filtered_records:
+            img_path = self._record_image_path(rec)
+            if not img_path:
+                continue
+            thumb_path = self._thumb_for_record(rec)
+            thumbs.append(thumb_path)
+            images.append(img_path)
+        self.grid.thumbs = thumbs
+        self.grid.image_paths = images
         self.grid.update_grid_geometry()
         self.grid.update_visible_thumbnails()
 

@@ -23,6 +23,7 @@ class ThumbnailGrid(QWidget):
         super().__init__(parent)
         self.folder = folder or os.getcwd()
         self.thumbs = ensure_thumbnails_for_folder(self.folder)
+        self.image_paths = []
         self.selected_indices = set()
 
         self.scroll = QScrollArea(self)
@@ -50,7 +51,18 @@ class ThumbnailGrid(QWidget):
         self.images_selected.emit([])
 
     def get_selected_images(self):
-        return [self.thumbs[i] for i in self.selected_indices if 0 <= i < len(self.thumbs)]
+        out = []
+        for i in self.selected_indices:
+            if 0 <= i < len(self.thumbs):
+                out.append(self._image_path_for_index(i))
+        return out
+
+    def _image_path_for_index(self, idx: int) -> str:
+        if self.image_paths and idx < len(self.image_paths):
+            return self.image_paths[idx]
+        if 0 <= idx < len(self.thumbs):
+            return self.thumbs[idx].replace(".thumbnails", "").replace("\\", os.sep).replace("/", os.sep)
+        return ""
 
     def update_grid_geometry(self):
         rows = (len(self.thumbs) + self.COLS - 1) // self.COLS
@@ -119,7 +131,7 @@ class ThumbnailGrid(QWidget):
                 else:
                     self.selected_indices = {idx}
                     self.update_visible_thumbnails()
-                    img_path = self.thumbs[idx].replace('.thumbnails', '').replace('\\', os.sep).replace('/', os.sep)
+                    img_path = self._image_path_for_index(idx)
                     self.image_selected.emit(img_path, self.thumbs[idx])
                     self.images_selected.emit(self.get_selected_images())
         return handler
