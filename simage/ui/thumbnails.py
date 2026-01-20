@@ -1,14 +1,15 @@
 """
-Thumbnailer: Handles high-quality thumbnail generation and caching for SimageUI.
+Thumbnailer: Handles high-quality thumbnail generation and caching for Simage UI.
 """
 import os
 from PIL import Image
 
+from simage.utils.paths import resolve_repo_path
 
 THUMB_SIZE = (256, 256)
 THUMB_QUALITY = 90
-# Central thumbnail directory at project root
-THUMB_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".thumbnails"))
+# Central thumbnail directory at repo root
+THUMB_DIR = str(resolve_repo_path(".thumbnails", must_exist=False, allow_absolute=False))
 
 
 def ensure_thumbnail(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
@@ -22,7 +23,7 @@ def ensure_thumbnail(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
     base = os.path.basename(img_path)
     # Optionally, use a hash or relpath for uniqueness
     import hashlib
-    rel_path = os.path.relpath(img_path, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+    rel_path = os.path.relpath(img_path, os.path.abspath(resolve_repo_path(".", allow_absolute=False)))
     hash_part = hashlib.md5(rel_path.encode("utf-8")).hexdigest()[:8]
     thumb_name = f"{os.path.splitext(base)[0]}_{hash_part}.jpg"
     thumb_path = os.path.join(thumb_dir, thumb_name)
