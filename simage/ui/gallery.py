@@ -84,6 +84,41 @@ class GalleryTab(QWidget):
         batch_layout.addWidget(self.export_btn)
 
         grid_layout.addLayout(batch_layout)
+
+        self.grid = ThumbnailGrid()
+        self.grid.image_selected.connect(self.on_image_selected)
+        self.grid.images_selected.connect(self.on_images_selected)
+        grid_layout.addWidget(self.grid)
+
+        splitter.addWidget(grid_widget)
+
+        # Right: Side panel (image preview + info)
+        side_panel = QWidget()
+        side_layout = QVBoxLayout(side_panel)
+        self.image_preview = QLabel("No image selected")
+        self.image_preview.setAlignment(Qt.AlignCenter)
+        self.image_preview.setMinimumSize(256, 256)
+        self.image_preview.setFrameShape(QFrame.Box)
+        self.image_preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        side_layout.addWidget(self.image_preview)
+
+        self.info_window = QTextEdit()
+        self.info_window.setReadOnly(True)
+        self.info_window.setMinimumHeight(120)
+        side_layout.addWidget(self.info_window)
+        side_panel.setLayout(side_layout)
+        splitter.addWidget(side_panel)
+
+        splitter.setSizes([900, 300])
+        main_layout.addWidget(splitter)
+        self.setLayout(main_layout)
+
+        # Load all records for filtering
+        self.csv_path = str(resolve_repo_path("out/records.csv", must_exist=False, allow_absolute=False))
+        self.all_records = load_records(self.csv_path)
+        self.filtered_records = self.all_records
+        self.selected_images = []
+        self.update_grid()
     def apply_sort(self):
         key = self.sort_input.text().strip()
         if not key:
@@ -117,42 +152,6 @@ class GalleryTab(QWidget):
                     json.dump(rec, f, indent=2)
             # Ensure thumbnail remains in .thumbnails (archive)
             ensure_thumbnail(img_path, THUMB_DIR)
-
-        self.grid = ThumbnailGrid()
-        self.grid.image_selected.connect(self.on_image_selected)
-        self.grid.images_selected.connect(self.on_images_selected)
-        grid_layout.addWidget(self.grid)
-        grid_widget.setLayout(grid_layout)
-        splitter.addWidget(grid_widget)
-
-        # Right: Side panel (image preview + info)
-        side_panel = QWidget()
-        side_layout = QVBoxLayout(side_panel)
-        self.image_preview = QLabel("No image selected")
-        self.image_preview.setAlignment(Qt.AlignCenter)
-        self.image_preview.setMinimumSize(256, 256)
-        self.image_preview.setFrameShape(QFrame.Box)
-        self.image_preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        side_layout.addWidget(self.image_preview)
-
-        self.info_window = QTextEdit()
-        self.info_window.setReadOnly(True)
-        self.info_window.setMinimumHeight(120)
-        side_layout.addWidget(self.info_window)
-        side_panel.setLayout(side_layout)
-        splitter.addWidget(side_panel)
-
-        splitter.setSizes([900, 300])
-        main_layout.addWidget(splitter)
-
-        self.setLayout(main_layout)
-
-        # Load all records for filtering
-        self.csv_path = str(resolve_repo_path("out/records.csv", must_exist=False, allow_absolute=False))
-        self.all_records = load_records(self.csv_path)
-        self.filtered_records = self.all_records
-        self.selected_images = []
-        self.update_grid()
 
     def on_images_selected(self, image_paths):
         self.selected_images = image_paths
