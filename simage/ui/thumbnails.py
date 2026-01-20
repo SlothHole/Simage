@@ -15,7 +15,11 @@ THUMB_DIR = str(resolve_repo_path(".thumbnails", must_exist=False, allow_absolut
 def thumbnail_path_for_source(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
     base = os.path.basename(img_path)
     repo_root = str(resolve_repo_path(".", allow_absolute=False))
-    rel_path = os.path.relpath(img_path, repo_root)
+    try:
+        rel_path = os.path.relpath(img_path, repo_root)
+    except ValueError:
+        # On Windows, relpath fails if img_path is on a different drive.
+        rel_path = os.path.abspath(img_path)
     hash_part = hashlib.md5(rel_path.encode("utf-8")).hexdigest()[:8]
     thumb_name = f"{os.path.splitext(base)[0]}_{hash_part}.jpg"
     return os.path.join(thumb_dir, thumb_name)

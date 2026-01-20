@@ -1,6 +1,8 @@
 import sqlite3
 from pathlib import Path
 
+import csv
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QWidget,
@@ -14,7 +16,11 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QSpinBox,
-    QCheckBox,
+    QComboBox,
+    QListWidget,
+    QMessageBox,
+    QSplitter,
+    QAbstractItemView,
 )
 
 from simage.utils.paths import resolve_repo_path
@@ -24,6 +30,7 @@ class DatabaseViewerTab(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.conn = None
+        self._last_headers = []
 
         layout = QVBoxLayout(self)
 
@@ -32,21 +39,57 @@ class DatabaseViewerTab(QWidget):
         self.db_path = QLineEdit()
         self.db_path.setPlaceholderText("out/images.db")
         self.db_path.setText("out/images.db")
-        self.db_path.setReadOnly(True)
+        self.db_path.setReadOnly(False)
+        browse_btn = QPushButton("Browse")
+        browse_btn.clicked.connect(self.browse_db)
         connect_btn = QPushButton("Connect")
         connect_btn.clicked.connect(self.connect_db)
+        disconnect_btn = QPushButton("Disconnect")
+        disconnect_btn.clicked.connect(self.disconnect_db)
         conn_row.addWidget(QLabel("DB:"))
         conn_row.addWidget(self.db_path)
+        conn_row.addWidget(browse_btn)
         conn_row.addWidget(connect_btn)
+        conn_row.addWidget(disconnect_btn)
         layout.addLayout(conn_row)
 
         self.status_label = QLabel("Not connected.")
         layout.addWidget(self.status_label)
 
+        table_row = QHBoxLayout()
+        self.table_combo = QComboBox()
+        self.table_combo.setMinimumWidth(220)
+        refresh_tables_btn = QPushButton("Refresh Tables")
+        refresh_tables_btn.clicked.connect(self.refresh_tables)
+        load_table_btn = QPushButton("Load Table")
+        load_table_btn.clicked.connect(self.load_table)
+        describe_btn = QPushButton("Describe Table")
+        describe_btn.clicked.connect(self.describe_table)
+        count_btn = QPushButton("Row Count")
+        count_btn.clicked.connect(self.count_table)
+        table_row.addWidget(QLabel("Table:"))
+        table_row.addWidget(self.table_combo)
+        table_row.addWidget(refresh_tables_btn)
+        table_row.addWidget(load_table_btn)
+        table_row.addWidget(describe_btn)
+        table_row.addWidget(count_btn)
+        table_row.addStretch(1)
+        layout.addLayout(table_row)
+
         # SQL editor
+        editor_split = QSplitter(Qt.Horizontal)
         self.sql_input = QPlainTextEdit()
         self.sql_input.setPlaceholderText("Write SQL here. Example: SELECT * FROM images LIMIT 50;")
-        layout.addWidget(self.sql_input)
+        editor_split.addWidget(self.sql_input)
+
+        history_panel = QWidget()
+        history_layout = QVBoxLayout(history_panel)
+        history_layout.addWidget(QLabel("History"))
+        self.history_list = QListWidget()
+        self.history_list.itemDoubleClicked.connect(self.load_history_item)
+        history_layout.addWidget(self.history_list)
+        editor_split.addWidget(history_panel)
+        editor_split.setSizes([700, 240])
 
         run_row = QHBoxLayout()
         self.limit_spin = QSpinBox()
@@ -54,9 +97,21 @@ class DatabaseViewerTab(QWidget):
         self.limit_spin.setValue(500)
         run_btn = QPushButton("Run")
         run_btn.clicked.connect(self.run_sql)
+        export_btn = QPushButton("Export CSV")
+        export_btn.clicked.connect(self.export_csv)
+        copy_cell_btn = QPushButton("Copy Cells")
+        copy_cell_btn.clicked.connect(self.copy_cells)
+        copy_row_btn = QPushButton("Copy Rows")
+        copy_row_btn.clicked.connect(self.copy_rows)
+        clear_btn = QPushButton("Clear Results")
+        clear_btn.clicked.connect(self.clear_results)
         run_row.addWidget(QLabel("Max rows:"))
         run_row.addWidget(self.limit_spin)
         run_row.addStretch(1)
+        run_row.addWidget(export_btn)
+        run_row.addWidget(copy_cell_btn)
+        run_row.addWidget(copy_row_btn)
+        run_row.addWidget(clear_btn)
         run_row.addWidget(run_btn)
         layout.addLayout(run_row)
 
@@ -65,7 +120,14 @@ class DatabaseViewerTab(QWidget):
         self.table.setColumnCount(0)
         self.table.setRowCount(0)
         self.table.setAlternatingRowColors(True)
-        layout.addWidget(self.table)
+        self.table.setSelectionBehavior(QAbstractItemView.SelectItems)
+        self.table.setSelectionMode(QAbstractItemView.ExtendedSelection)
+
+        vertical_split = QSplitter(Qt.Vertical)
+        vertical_split.addWidget(editor_split)
+        vertical_split.addWidget(self.table)
+        vertical_split.setSizes([240, 520])
+        layout.addWidget(vertical_split)
 
     def _resolve_db_path(self, path_str: str) -> str:
         raw = Path(path_str)
@@ -86,12 +148,74 @@ class DatabaseViewerTab(QWidget):
                 pass
             self.conn = None
 
-        db_path = self._resolve_db_path("out/images.db")
+        db_path = self._resolve_db_path(path)
         uri = f"file:{db_path}?mode=ro"
         self.conn = sqlite3.connect(uri, uri=True)
 
         self.conn.row_factory = sqlite3.Row
         self.status_label.setText(f"Connected: {db_path}")
+        self.refresh_tables()
+
+    def disconnect_db(self) -> None:
+        if self.conn is None:
+            self.status_label.setText("Not connected.")
+            return
+        try:
+            self.conn.close()
+        except Exception:
+            pass
+        self.conn = None
+        self.table_combo.clear()
+        self.status_label.setText("Disconnected.")
+
+    def browse_db(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Select SQLite DB", "", "SQLite DB (*.db *.sqlite *.sqlite3)")
+        if not path:
+            return
+        self.db_path.setText(path)
+
+    def refresh_tables(self) -> None:
+        if self.conn is None:
+            self.status_label.setText("Not connected.")
+            return
+        try:
+            cur = self.conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type IN ('table','view') ORDER BY name;")
+            tables = [r[0] for r in cur.fetchall()]
+            self.table_combo.clear()
+            self.table_combo.addItems(tables)
+            self.status_label.setText(f"Tables: {len(tables)}")
+        except Exception as exc:
+            self.status_label.setText(f"Error: {exc}")
+
+    def _selected_table(self) -> str:
+        return self.table_combo.currentText().strip()
+
+    def load_table(self) -> None:
+        table = self._selected_table()
+        if not table:
+            self.status_label.setText("No table selected.")
+            return
+        limit = self.limit_spin.value()
+        limit_clause = f" LIMIT {limit}" if limit else ""
+        self.sql_input.setPlainText(f'SELECT * FROM "{table}"{limit_clause};')
+        self.run_sql()
+
+    def describe_table(self) -> None:
+        table = self._selected_table()
+        if not table:
+            self.status_label.setText("No table selected.")
+            return
+        self.sql_input.setPlainText(f'PRAGMA table_info("{table}");')
+        self.run_sql()
+
+    def count_table(self) -> None:
+        table = self._selected_table()
+        if not table:
+            self.status_label.setText("No table selected.")
+            return
+        self.sql_input.setPlainText(f'SELECT COUNT(*) AS row_count FROM "{table}";')
+        self.run_sql()
 
     def run_sql(self) -> None:
         if self.conn is None:
@@ -102,6 +226,7 @@ class DatabaseViewerTab(QWidget):
         if not sql:
             self.status_label.setText("SQL is empty.")
             return
+        self._push_history(sql)
 
         try:
             cur = self.conn.cursor()
@@ -118,6 +243,7 @@ class DatabaseViewerTab(QWidget):
             if cur.description:
                 rows = cur.fetchmany(self.limit_spin.value() or 0) if self.limit_spin.value() else cur.fetchall()
                 cols = [d[0] for d in cur.description]
+                self._last_headers = cols
                 self.table.setColumnCount(len(cols))
                 self.table.setHorizontalHeaderLabels(cols)
                 self.table.setRowCount(len(rows))
@@ -135,3 +261,75 @@ class DatabaseViewerTab(QWidget):
                 self.table.setColumnCount(0)
         except Exception as exc:
             self.status_label.setText(f"Error: {exc}")
+
+    def _push_history(self, sql: str) -> None:
+        sql = sql.strip()
+        if not sql:
+            return
+        for i in range(self.history_list.count()):
+            if self.history_list.item(i).text() == sql:
+                return
+        self.history_list.insertItem(0, sql)
+        if self.history_list.count() > 50:
+            self.history_list.takeItem(self.history_list.count() - 1)
+
+    def load_history_item(self) -> None:
+        item = self.history_list.currentItem()
+        if not item:
+            return
+        self.sql_input.setPlainText(item.text())
+
+    def export_csv(self) -> None:
+        if self.table.rowCount() == 0 or self.table.columnCount() == 0:
+            QMessageBox.information(self, "Export CSV", "No results to export.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save CSV", "results.csv", "CSV Files (*.csv)")
+        if not path:
+            return
+        headers = self._last_headers or [self.table.horizontalHeaderItem(i).text() for i in range(self.table.columnCount())]
+        try:
+            with open(path, "w", encoding="utf-8", newline="") as f:
+                writer = csv.writer(f)
+                writer.writerow(headers)
+                for row in range(self.table.rowCount()):
+                    writer.writerow(
+                        [self.table.item(row, col).text() if self.table.item(row, col) else "" for col in range(self.table.columnCount())]
+                    )
+            QMessageBox.information(self, "Export CSV", f"Saved {self.table.rowCount()} row(s).")
+        except Exception as exc:
+            QMessageBox.critical(self, "Export CSV", f"Failed to save CSV: {exc}")
+
+    def copy_cells(self) -> None:
+        indexes = self.table.selectedIndexes()
+        if not indexes:
+            return
+        indexes = sorted(indexes, key=lambda idx: (idx.row(), idx.column()))
+        rows = {}
+        for idx in indexes:
+            rows.setdefault(idx.row(), {})[idx.column()] = self.table.item(idx.row(), idx.column()).text() if self.table.item(idx.row(), idx.column()) else ""
+        lines = []
+        for row in sorted(rows.keys()):
+            cols = rows[row]
+            line = "\t".join(cols.get(c, "") for c in sorted(cols.keys()))
+            lines.append(line)
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def copy_rows(self) -> None:
+        rows = sorted({idx.row() for idx in self.table.selectedIndexes()})
+        if not rows:
+            return
+        lines = []
+        for row in rows:
+            lines.append(
+                "\t".join(
+                    self.table.item(row, col).text() if self.table.item(row, col) else ""
+                    for col in range(self.table.columnCount())
+                )
+            )
+        QApplication.clipboard().setText("\n".join(lines))
+
+    def clear_results(self) -> None:
+        self.table.setRowCount(0)
+        self.table.setColumnCount(0)
+        self._last_headers = []
+        self.status_label.setText("Results cleared.")

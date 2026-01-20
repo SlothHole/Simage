@@ -1,3 +1,4 @@
+import json
 import os
 import sqlite3
 from pathlib import Path
@@ -12,6 +13,7 @@ from simage.core.ingest import (
     clean_ws,
     parse_ksampler_widgets,
     extract_comfyui_params,
+    extract_comfyui_prompts,
     enforce_pos_neg_separation,
     split_tokens_top_level,
     parse_weighted_token,
@@ -20,6 +22,7 @@ from simage.core.ingest import (
     normalize_scheduler,
     postprocess_prompts_and_params,
     extract_candidate_blobs,
+    extract_keyed_fields,
     parse_a1111_parameters,
     parse_comfyui_embedded_json,
     merge_missing_values,
@@ -102,6 +105,17 @@ def test_extract_comfyui_params_from_widgets():
     assert out["cfg_scale"] == 7.0
     assert out["sampler"] == "euler"
     assert out["scheduler"] == "simple"
+
+def test_extract_comfyui_prompts_from_nodes():
+    workflow = {
+        "nodes": [
+            {"type": "Prompt (LoraManager)", "widgets_values": ["pos text"]},
+            {"type": "CLIPTextEncode", "title": "CLIP Text Encode (Negative Prompt)", "widgets_values": ["neg text"]},
+        ]
+    }
+    pos, neg = extract_comfyui_prompts(workflow)
+    assert pos == "pos text"
+    assert neg == "neg text"
 
 def test_merge_record_lists_preserves_old_values():
     old_records = [
@@ -191,6 +205,22 @@ def test_extract_candidate_blobs_picks_keys_and_markers():
     keys = {k for k, _v in blobs}
     assert "PNG:Parameters" in keys
     assert "Other" in keys
+
+
+def test_extract_keyed_fields_prefers_prompt_keys():
+    exif_obj = {
+        "PNG:Prompt": "pos text",
+        "PNG:NegativePrompt": "neg text",
+    }
+    out = extract_keyed_fields(exif_obj)
+    assert out["prompt"] == "pos text"
+    assert out["negative_prompt"] == "neg text"
+
+
+def test_extract_keyed_fields_skips_camera_model():
+    exif_obj = {"EXIF:Model": "Canon EOS"}
+    out = extract_keyed_fields(exif_obj)
+    assert "model" not in out
 
 
 def test_parse_a1111_parameters_extracts_fields():
@@ -297,3 +327,20 @@ def test_normalize_record_extracts_prompt(tmp_path: Path):
     assert rec["file_name"] == "test.png"
     assert rec["prompt"] == "A cat."
     assert rec["negative_prompt"] == "blurry"
+
+
+def test_normalize_record_prefers_workflow_prompt(tmp_path: Path):
+    img_path = tmp_path / "test2.png"
+    img_path.write_bytes(b"fake")
+    workflow = {
+        "nodes": [
+            {"type": "Prompt (LoraManager)", "widgets_values": ["workflow prompt"]},
+        ]
+    }
+    exif_obj = {
+        "SourceFile": os.fspath(img_path),
+        "PNG:Parameters": "A1111 prompt. Steps: 10",
+        "PNG:Workflow": json.dumps(workflow),
+    }
+    rec = normalize_record(exif_obj)
+    assert rec["prompt"] == "workflow prompt"

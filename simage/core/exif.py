@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -40,7 +41,42 @@ def run_exiftool(input_path: Path, exiftool: str, temp_json: Path) -> None:
         )
 
 
-def json_array_to_jsonl(temp_json: Path, out_jsonl: Path) -> int:
+def _record_key(item: dict) -> str:
+    src = item.get("SourceFile") or item.get("File:FileName") or item.get("FileName") or ""
+    if not isinstance(src, str):
+        return ""
+    return src.replace("\\", "/").lower().strip()
+
+
+def _load_existing_keys(out_jsonl: Path) -> set[str]:
+    if not out_jsonl.exists():
+        return set()
+    keys = set()
+    with out_jsonl.open("r", encoding="utf-8") as f_in:
+        for line in f_in:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+            except Exception:
+                continue
+            key = _record_key(item)
+            if key:
+                keys.add(key)
+    return keys
+
+
+def _ensure_trailing_newline(path: Path) -> None:
+    if not path.exists() or path.stat().st_size == 0:
+        return
+    with path.open("rb+") as f:
+        f.seek(-1, os.SEEK_END)
+        if f.read(1) != b"\n":
+            f.write(b"\n")
+
+
+def append_new_jsonl(temp_json: Path, out_jsonl: Path) -> int:
     with temp_json.open("r", encoding="utf-8") as f_in:
         payload = json.load(f_in)
 
@@ -48,10 +84,20 @@ def json_array_to_jsonl(temp_json: Path, out_jsonl: Path) -> int:
         raise ValueError("ExifTool output was not a JSON array.")
 
     out_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    existing = _load_existing_keys(out_jsonl)
+    _ensure_trailing_newline(out_jsonl)
+
     count = 0
-    with out_jsonl.open("w", encoding="utf-8") as f_out:
+    with out_jsonl.open("a", encoding="utf-8") as f_out:
         for item in payload:
+            if not isinstance(item, dict):
+                continue
+            key = _record_key(item)
+            if key and key in existing:
+                continue
             f_out.write(json.dumps(item, ensure_ascii=False) + "\n")
+            if key:
+                existing.add(key)
             count += 1
     return count
 
@@ -71,8 +117,11 @@ def main() -> int:
 
     has_files = any(p.is_file() for p in input_path.rglob("*"))
     if not has_files:
-        out_jsonl.write_text("", encoding="utf-8")
-        print(f"No input files found in {input_path}. Wrote empty JSONL: {out_jsonl}")
+        if not out_jsonl.exists():
+            out_jsonl.write_text("", encoding="utf-8")
+            print(f"No input files found in {input_path}. Wrote empty JSONL: {out_jsonl}")
+        else:
+            print(f"No input files found in {input_path}. Leaving existing JSONL unchanged.")
         return 0
 
     with tempfile.NamedTemporaryFile(prefix="exif_", suffix=".json", dir=out_dir, delete=False) as tmp:
@@ -80,7 +129,7 @@ def main() -> int:
 
     try:
         run_exiftool(input_path, args.exiftool, temp_json)
-        count = json_array_to_jsonl(temp_json, out_jsonl)
+        count = append_new_jsonl(temp_json, out_jsonl)
     except FileNotFoundError as exc:
         raise FileNotFoundError(
             f"ExifTool not found ({args.exiftool}). Install exiftool or provide --exiftool path."
@@ -89,8 +138,10 @@ def main() -> int:
         if temp_json.exists():
             temp_json.unlink()
 
-    print(f"Wrote JSONL: {out_jsonl}")
-    print(f"Files: {count}")
+    if count:
+        print(f"Appended {count} new record(s) to JSONL: {out_jsonl}")
+    else:
+        print(f"No new records found. JSONL unchanged: {out_jsonl}")
     return 0
 
 

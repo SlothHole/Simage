@@ -31,7 +31,7 @@ import os
 import re
 import sqlite3
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from simage.utils.paths import resolve_repo_path, resolve_repo_relative
 
@@ -129,6 +129,17 @@ def clean_ws(s: str) -> str:
     s = re.sub(r"[ \t]+", " ", s)
     s = re.sub(r"\n{3,}", "\n\n", s)
     return s.strip()
+
+
+def _key_has_any(lk: str, hints: Tuple[str, ...]) -> bool:
+    return any(h in lk for h in hints)
+
+
+def _is_camera_model_key(lk: str) -> bool:
+    if not lk.endswith(":model"):
+        return False
+    prefix = lk.split(":", 1)[0]
+    return prefix in ("exif", "ifd0", "quicktime")
 
 
 def iter_node_dicts(workflow: Any) -> Iterable[Dict[str, Any]]:
@@ -243,6 +254,62 @@ def parse_ksampler_widgets(values: List[Any]) -> Dict[str, Any]:
             out["cfg_scale"] = f
 
     return out
+
+
+def _best_prompt_candidate(values: List[str]) -> Optional[str]:
+    cleaned = [clean_ws(v) for v in values if isinstance(v, str) and v.strip()]
+    if not cleaned:
+        return None
+    return max(cleaned, key=len)
+
+
+def extract_comfyui_prompts(workflow: Any) -> Tuple[Optional[str], Optional[str]]:
+    """
+    Extract likely positive/negative prompts from ComfyUI-style workflows.
+
+    We look for prompt-like nodes (Prompt / CLIPTextEncode) and prefer the
+    longest candidate text for each side.
+    """
+    if not isinstance(workflow, (dict, list)):
+        return None, None
+
+    pos_candidates: List[str] = []
+    neg_candidates: List[str] = []
+
+    for node in iter_node_dicts(workflow):
+        label_parts = [
+            node.get("class_type"),
+            node.get("type"),
+            node.get("title"),
+            node.get("name"),
+        ]
+        label = " ".join(str(p) for p in label_parts if p).lower()
+
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        for k, v in inputs.items():
+            if not isinstance(v, str) or not v.strip():
+                continue
+            key = str(k).lower()
+            if "negative" in key:
+                neg_candidates.append(v)
+            elif key in ("text", "prompt", "positive") or "positive" in key:
+                pos_candidates.append(v)
+
+        widgets = node.get("widgets_values")
+        if isinstance(widgets, list):
+            widget_text = [v for v in widgets if isinstance(v, str) and v.strip()]
+            if widget_text:
+                best = _best_prompt_candidate(widget_text)
+                if not best:
+                    continue
+                if "negative" in label:
+                    neg_candidates.append(best)
+                elif "prompt" in label or "cliptextencode" in label:
+                    pos_candidates.append(best)
+
+    pos = _best_prompt_candidate(pos_candidates)
+    neg = _best_prompt_candidate(neg_candidates)
+    return pos, neg
 
 
 def extract_comfyui_params(workflow: Any) -> Dict[str, Any]:
@@ -534,11 +601,26 @@ def postprocess_prompts_and_params(rec: Dict[str, Any]) -> None:
     )
 
     if pos:
+        rec["prompt"] = pos
+        kv["prompt"] = pos
         kv["prompt_text"] = pos
         kv["prompt_tokens"] = tokenize_prompt(pos)
+    else:
+        rec["prompt"] = None
+        kv.pop("prompt", None)
+        kv.pop("prompt_text", None)
+        kv.pop("prompt_tokens", None)
+
     if neg:
+        rec["negative_prompt"] = neg
+        kv["negative_prompt"] = neg
         kv["neg_prompt_text"] = neg
         kv["neg_tokens"] = tokenize_prompt(neg)
+    else:
+        rec["negative_prompt"] = None
+        kv.pop("negative_prompt", None)
+        kv.pop("neg_prompt_text", None)
+        kv.pop("neg_tokens", None)
 
     # normalize sampler/scheduler
     sampler_raw = kv.get("sampler") if "sampler" in kv else rec.get("sampler")
@@ -834,6 +916,7 @@ def normalize_record(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
             rec["kv"]["workflow_json"] = wf
         rec["workflow_json"] = wf  # keep in JSONL export
 
+        # Extract key params from workflow (values only, not raw workflow JSON).
         for fld in ("seed", "steps", "width", "height", "sampler", "scheduler", "model"):
             if fld in comfy and rec.get(fld) in (None, ""):
                 if fld in ("sampler", "scheduler", "model"):
@@ -857,28 +940,37 @@ def normalize_record(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
             except Exception:
                 pass
 
-        # prompt/negative_prompt if extracted conservatively
-        if "prompt" in comfy and isinstance(comfy["prompt"], str):
-            rec["prompt"] = comfy["prompt"]
-        if "negative_prompt" in comfy and isinstance(comfy["negative_prompt"], str):
-            rec["negative_prompt"] = comfy["negative_prompt"]
-
         break
 
     # Try A1111-like parameters text (also when workflow JSON exists)
     for k, v in blobs:
         if not isinstance(v, str):
             continue
+        if is_probably_json(v):
+            continue
+        if "workflow" in str(k).lower():
+            continue
         if looks_like_a1111_text(v):
             parsed = parse_a1111_parameters(v)
             if parsed.get("raw_text") and not rec.get("raw_text_preview"):
                 rec["raw_text_preview"] = parsed.get("raw_text")
-            if parsed.get("format_hint") and rec.get("format_hint") in (None, "comfyui_like"):
+            if parsed.get("format_hint") and rec.get("format_hint") in (None, ""):
                 rec["format_hint"] = parsed.get("format_hint")
             for fld in ("prompt", "negative_prompt", "steps", "cfg_scale", "seed", "width", "height", "sampler", "scheduler", "model"):
                 if fld in parsed and parsed[fld] not in (None, "") and rec.get(fld) in (None, ""):
                     rec[fld] = parsed[fld]
             break
+
+    keyed = extract_keyed_fields(exif_obj)
+    for fld, val in keyed.items():
+        if rec.get(fld) in (None, ""):
+            rec[fld] = val
+
+    wf_prompt, wf_neg = extract_comfyui_prompts(rec.get("workflow_json"))
+    if wf_prompt:
+        rec["prompt"] = wf_prompt
+    if wf_neg:
+        rec["negative_prompt"] = wf_neg
 
     if rec["raw_text_preview"] is None and blobs:
         rec["raw_text_preview"] = str(blobs[0][1])[:2000]
@@ -992,6 +1084,109 @@ def load_jsonl(path: str) -> List[Dict[str, Any]]:
     return out
 
 
+PROMPT_KEY_HINTS = ("prompt", "positive", "pos_prompt", "positive_prompt")
+NEG_PROMPT_KEY_HINTS = ("negative prompt", "negative_prompt", "neg_prompt", "negprompt", "negative")
+MODEL_KEY_HINTS = ("model", "checkpoint", "ckpt")
+SAMPLER_KEY_HINTS = ("sampler",)
+SCHEDULER_KEY_HINTS = ("scheduler",)
+STEPS_KEY_HINTS = ("steps",)
+CFG_KEY_HINTS = ("cfg scale", "cfg_scale", "cfgscale", "cfg")
+SEED_KEY_HINTS = ("seed",)
+WIDTH_KEY_HINTS = ("width",)
+HEIGHT_KEY_HINTS = ("height",)
+
+
+def extract_keyed_fields(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Extract direct field values from EXIF keys (not just A1111 blocks).
+    Uses key names to detect where values belong and returns a best-effort map.
+    """
+    out: Dict[str, Any] = {}
+    pos_candidates: List[str] = []
+    neg_candidates: List[str] = []
+
+    for k, v in exif_obj.items():
+        if v in (None, ""):
+            continue
+        lk = str(k).lower()
+        if "workflow" in lk:
+            continue
+
+        if isinstance(v, str):
+            if _key_has_any(lk, NEG_PROMPT_KEY_HINTS) and "prompt" in lk:
+                neg_candidates.append(v)
+                continue
+            if _key_has_any(lk, PROMPT_KEY_HINTS):
+                pos_candidates.append(v)
+                continue
+
+            if _key_has_any(lk, MODEL_KEY_HINTS) and not _is_camera_model_key(lk):
+                if "model" not in out:
+                    out["model"] = clean_ws(v)
+                continue
+
+            if _key_has_any(lk, SAMPLER_KEY_HINTS) and "sampler" not in out:
+                out["sampler"] = clean_ws(v)
+                continue
+
+            if _key_has_any(lk, SCHEDULER_KEY_HINTS) and "scheduler" not in out:
+                out["scheduler"] = clean_ws(v)
+                continue
+
+            if _key_has_any(lk, STEPS_KEY_HINTS) and "steps" not in out:
+                steps = _to_int(v)
+                if steps is not None:
+                    out["steps"] = steps
+                continue
+
+            if _key_has_any(lk, CFG_KEY_HINTS) and "cfg_scale" not in out:
+                if "config" not in lk:
+                    cfg = _to_float(v)
+                    if cfg is not None:
+                        out["cfg_scale"] = cfg
+                continue
+
+            if _key_has_any(lk, SEED_KEY_HINTS) and "seed" not in out:
+                seed = _to_int(v)
+                if seed is not None:
+                    out["seed"] = seed
+                continue
+
+            if _key_has_any(lk, WIDTH_KEY_HINTS) and "width" not in out:
+                width = _to_int(v)
+                if width is not None:
+                    out["width"] = width
+                continue
+
+            if _key_has_any(lk, HEIGHT_KEY_HINTS) and "height" not in out:
+                height = _to_int(v)
+                if height is not None:
+                    out["height"] = height
+                continue
+
+        elif isinstance(v, (int, float)):
+            if _key_has_any(lk, STEPS_KEY_HINTS) and "steps" not in out:
+                out["steps"] = int(v)
+            if _key_has_any(lk, SEED_KEY_HINTS) and "seed" not in out:
+                out["seed"] = int(v)
+            if _key_has_any(lk, WIDTH_KEY_HINTS) and "width" not in out:
+                out["width"] = int(v)
+            if _key_has_any(lk, HEIGHT_KEY_HINTS) and "height" not in out:
+                out["height"] = int(v)
+            if _key_has_any(lk, CFG_KEY_HINTS) and "cfg_scale" not in out:
+                if "config" not in lk:
+                    out["cfg_scale"] = float(v)
+
+    pos = _best_prompt_candidate(pos_candidates)
+    neg = _best_prompt_candidate(neg_candidates)
+    if pos:
+        out["prompt"] = pos
+    if neg:
+        out["negative_prompt"] = neg
+
+    return out
+
+
 def merge_missing_values(target: Dict[str, Any], source: Dict[str, Any]) -> None:
     for k, v in source.items():
         if k in target and isinstance(target[k], dict) and isinstance(v, dict):
@@ -1033,7 +1228,7 @@ def merge_record_lists(
 
 
 def compute_csv_columns(records: List[Dict[str, Any]]) -> List[str]:
-    extra = sorted({k for r in records for k in r.keys()} - set(CSV_COLUMNS))
+    extra = sorted({k for r in records for k in r.keys()} - set(CSV_COLUMNS) - {"kv", "resources", "workflow_json", "raw_text_preview"})
     return CSV_COLUMNS + extra
 
 
