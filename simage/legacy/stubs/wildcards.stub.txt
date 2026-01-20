@@ -1,0 +1,3 @@
+stub: wildcards
+moved_to: simage/core/wildcards.py
+module: simage.core.wildcards

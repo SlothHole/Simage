@@ -1,19 +1,3 @@
-def sha256_file_backup(path: str) -> Optional[str]:
-    """
-    Backup: Directly compute SHA256 for any file path, bypassing repo-relative logic.
-    """
-    try:
-        from pathlib import Path
-        abs_path = Path(path)
-        if not abs_path.exists():
-            return None
-        h = hashlib.sha256()
-        with open(abs_path, "rb") as f:
-            for chunk in iter(lambda: f.read(1024 * 1024), b""):
-                h.update(chunk)
-        return h.hexdigest()
-    except Exception:
-        return None
 """
 Ingest EXIF JSONL into SQLite and exports.
 
@@ -36,6 +20,8 @@ Adds (prompt + params quality-of-life):
   * kv keys: steps_norm, cfg_scale_norm, seed_norm, size_norm
 """
 
+from __future__ import annotations
+
 import argparse
 import csv
 import datetime as dt
@@ -48,6 +34,25 @@ import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
 from simage.utils.paths import resolve_repo_path, resolve_repo_relative
+
+
+def sha256_file_backup(path: str) -> Optional[str]:
+    """
+    Backup: Directly compute SHA256 for any file path, bypassing repo-relative logic.
+    """
+    try:
+        from pathlib import Path
+
+        abs_path = Path(path)
+        if not abs_path.exists():
+            return None
+        h = hashlib.sha256()
+        with open(abs_path, "rb") as f:
+            for chunk in iter(lambda: f.read(1024 * 1024), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return None
 
 
 # ---------- helpers ----------

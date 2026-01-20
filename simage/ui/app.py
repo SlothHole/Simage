@@ -10,10 +10,10 @@ from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
 
 from simage.utils.paths import resolve_repo_path
 from .gallery import GalleryTab
-# from .edit import EditTab
-# from .batch import BatchTab
-# from .settings import SettingsTab
-# from .viewer import ViewerTab
+from .edit import EditTab
+from .batch import BatchTab
+from .settings import SettingsTab
+from .viewer import ViewerTab
 
 class SimageUIMain(QMainWindow):
     def __init__(self):
@@ -26,23 +26,10 @@ class SimageUIMain(QMainWindow):
         self.tabs.setMovable(True)
         self.tabs.addTab(GalleryTab(self), "Gallery & Search")
         self.tabs.addTab(TagTab(self), "Tag Images")
-        # Future tabs: Uncomment and implement as needed
-        # try:
-        #     self.tabs.addTab(EditTab(self), "Edit Images")
-        # except Exception:
-        #     pass
-        # try:
-        #     self.tabs.addTab(BatchTab(self), "Batch Processing")
-        # except Exception:
-        #     pass
-        # try:
-        #     self.tabs.addTab(SettingsTab(self), "Settings")
-        # except Exception:
-        #     pass
-        # try:
-        #     self.tabs.addTab(ViewerTab(self), "Full Image Viewer")
-        # except Exception:
-        #     pass
+        self.tabs.addTab(EditTab(self), "Edit Images")
+        self.tabs.addTab(BatchTab(self), "Batch Processing")
+        self.tabs.addTab(SettingsTab(self), "Settings")
+        self.tabs.addTab(ViewerTab(self), "Full Image Viewer")
 
 
 # --- TagTab implementation ---
@@ -57,8 +44,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
 )
-from PySide6.QtCore import Qt
-
 from .csv_edit import amend_records_csv
 from .change_log import ChangeLogger
 

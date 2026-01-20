@@ -1,0 +1,3 @@
+stub: cli
+moved_to: simage/cli.py
+module: simage.cli

@@ -1,0 +1,3 @@
+stub: resources
+moved_to: simage/core/resources.py
+module: simage.core.resources

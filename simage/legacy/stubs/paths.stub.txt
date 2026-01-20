@@ -1,0 +1,3 @@
+stub: paths
+moved_to: simage/utils/paths.py
+module: simage.utils.paths

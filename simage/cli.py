@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Callable, List, Optional
+from typing import Callable, List
 
 from simage.utils.paths import resolve_repo_path
 

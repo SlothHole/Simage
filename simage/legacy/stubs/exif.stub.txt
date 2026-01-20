@@ -1,0 +1,3 @@
+stub: exif
+moved_to: simage/core/exif.py
+module: simage.core.exif

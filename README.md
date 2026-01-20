@@ -17,6 +17,10 @@ Local pipeline for extracting AI image metadata and normalizing into SQLite.
 - Input/: source images
 - out/: generated outputs
 
+## Naming
+
+- Legacy stubs in `simage/legacy/stubs` use `<module>.stub.txt` and include `moved_to` + `module` mappings.
+
 ## Setup
 
 - Python 3.11+

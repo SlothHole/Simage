@@ -23,7 +23,8 @@ def ensure_thumbnail(img_path: str, thumb_dir: str = THUMB_DIR) -> str:
     base = os.path.basename(img_path)
     # Optionally, use a hash or relpath for uniqueness
     import hashlib
-    rel_path = os.path.relpath(img_path, os.path.abspath(resolve_repo_path(".", allow_absolute=False)))
+    repo_root = str(resolve_repo_path(".", allow_absolute=False))
+    rel_path = os.path.relpath(img_path, repo_root)
     hash_part = hashlib.md5(rel_path.encode("utf-8")).hexdigest()[:8]
     thumb_name = f"{os.path.splitext(base)[0]}_{hash_part}.jpg"
     thumb_path = os.path.join(thumb_dir, thumb_name)

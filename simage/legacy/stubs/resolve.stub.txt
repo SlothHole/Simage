@@ -1,0 +1,3 @@
+stub: resolve
+moved_to: simage/core/resolve.py
+module: simage.core.resolve
