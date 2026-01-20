@@ -152,8 +152,13 @@ class GalleryTab(QWidget):
         self.all_records = load_records(self.csv_path)
         self.filtered_records = self.all_records
         self.selected_images = []
+        self.csv_columns = self._compute_csv_columns(self.all_records)
         self.thumb_cache = {}
         self.update_grid()
+
+    def _compute_csv_columns(self, records):
+        extra = sorted({k for r in records for k in r.keys()} - set(CSV_COLUMNS))
+        return CSV_COLUMNS + extra
 
     def _record_key(self, rec):
         return rec.get("source_file") or rec.get("file_name") or ""
@@ -161,6 +166,8 @@ class GalleryTab(QWidget):
     def _record_image_path(self, rec):
         src = rec.get("source_file")
         if isinstance(src, str) and src:
+            if os.path.isabs(src):
+                return src
             return str(resolve_repo_path(src, must_exist=False, allow_absolute=False))
         name = rec.get("file_name")
         if isinstance(name, str) and name:
@@ -211,10 +218,10 @@ class GalleryTab(QWidget):
     def _write_csv(self, path, records):
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=CSV_COLUMNS)
+            w = csv.DictWriter(f, fieldnames=self.csv_columns)
             w.writeheader()
             for rec in records:
-                row = {c: rec.get(c) for c in CSV_COLUMNS}
+                row = {c: rec.get(c) for c in self.csv_columns}
                 w.writerow(row)
 
     def _delete_missing_records(self, records):
@@ -244,6 +251,30 @@ class GalleryTab(QWidget):
             conn.close()
         except Exception:
             pass
+
+    def _merge_missing_values(self, target, source):
+        for k, v in source.items():
+            if k in target and isinstance(target[k], dict) and isinstance(v, dict):
+                self._merge_missing_values(target[k], v)
+            elif k not in target or target[k] in (None, ""):
+                target[k] = v
+
+    def _merge_records(self, new_records, old_records):
+        old_by_key = {self._record_key(r): r for r in old_records if self._record_key(r)}
+        old_by_name = {}
+        for r in old_records:
+            name = r.get("file_name")
+            if name and name not in old_by_name:
+                old_by_name[name] = r
+
+        for rec in new_records:
+            key = self._record_key(rec)
+            old = old_by_key.get(key) or old_by_name.get(rec.get("file_name"))
+            if not old:
+                continue
+            for col in self.csv_columns:
+                if rec.get(col) in (None, "") and old.get(col) not in (None, ""):
+                    rec[col] = old.get(col)
     def apply_sort(self):
         key = self.sort_input.text().strip()
         if not key:
@@ -370,6 +401,24 @@ class GalleryTab(QWidget):
         new_jsonl_path = str(resolve_repo_path("out/records.jsonl", must_exist=False, allow_absolute=False))
         new_jsonl = self._load_jsonl(new_jsonl_path)
 
+        self.csv_columns = self._compute_csv_columns(old_records + new_records)
+        self._merge_records(new_records, old_records)
+
+        old_jsonl_by_key = {self._record_key(r): r for r in old_jsonl if self._record_key(r)}
+        old_jsonl_by_name = {}
+        for r in old_jsonl:
+            name = r.get("file_name")
+            if name and name not in old_jsonl_by_name:
+                old_jsonl_by_name[name] = r
+        for rec in new_jsonl:
+            key = self._record_key(rec)
+            old = old_jsonl_by_key.get(key) or old_jsonl_by_name.get(rec.get("file_name"))
+            if old:
+                self._merge_missing_values(rec, old)
+
+        self._write_csv(self.csv_path, new_records)
+        self._write_jsonl(new_jsonl_path, new_jsonl)
+
         old_map = {self._record_key(r): r for r in old_records if self._record_key(r)}
         new_keys = {self._record_key(r) for r in new_records if self._record_key(r)}
         missing_records = [old_map[k] for k in old_map if k not in new_keys]
@@ -390,6 +439,7 @@ class GalleryTab(QWidget):
             else:
                 merged_records = list(new_records)
                 merged_records.extend(missing_records)
+                self.csv_columns = self._compute_csv_columns(merged_records)
                 self._write_csv(self.csv_path, merged_records)
 
                 old_jsonl_map = {self._record_key(r): r for r in old_jsonl if self._record_key(r)}

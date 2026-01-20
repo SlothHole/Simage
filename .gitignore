@@ -4,3 +4,6 @@
 
 # Ignore imported source images
 /Input/*
+
+# Ignore archived outputs used for reference
+/old_out_not_use/*

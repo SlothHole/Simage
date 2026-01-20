@@ -14,6 +14,7 @@ from .edit import EditTab
 from .batch import BatchTab
 from .settings import SettingsTab
 from .viewer import ViewerTab
+from .db_viewer import DatabaseViewerTab
 
 class SimageUIMain(QMainWindow):
     def __init__(self):
@@ -30,6 +31,7 @@ class SimageUIMain(QMainWindow):
         self.tabs.addTab(BatchTab(self), "Batch Processing")
         self.tabs.addTab(SettingsTab(self), "Settings")
         self.tabs.addTab(ViewerTab(self), "Full Image Viewer")
+        self.tabs.addTab(DatabaseViewerTab(self), "DB Viewer")
 
 
 # --- TagTab implementation ---

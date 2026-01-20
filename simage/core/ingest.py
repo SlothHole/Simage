@@ -55,6 +55,25 @@ def sha256_file_backup(path: str) -> Optional[str]:
         return None
 
 
+CSV_COLUMNS = [
+    "id",
+    "source_file",
+    "file_name",
+    "ext",
+    "width",
+    "height",
+    "format_hint",
+    "model",
+    "sampler",
+    "scheduler",
+    "steps",
+    "cfg_scale",
+    "seed",
+    "prompt",
+    "negative_prompt",
+]
+
+
 # ---------- helpers ----------
 
 def utc_now_iso() -> str:
@@ -112,6 +131,29 @@ def clean_ws(s: str) -> str:
     return s.strip()
 
 
+def iter_node_dicts(workflow: Any) -> Iterable[Dict[str, Any]]:
+    if isinstance(workflow, dict):
+        for container_key in ("prompt", "workflow", "graph"):
+            if container_key in workflow:
+                yield from iter_node_dicts(workflow[container_key])
+
+        nodes = workflow.get("nodes")
+        if isinstance(nodes, dict):
+            yield from iter_node_dicts(nodes)
+        elif isinstance(nodes, list):
+            for item in nodes:
+                if isinstance(item, dict):
+                    yield item
+
+        for v in workflow.values():
+            if isinstance(v, dict) and ("class_type" in v or "inputs" in v or "type" in v):
+                yield v
+    elif isinstance(workflow, list):
+        for item in workflow:
+            if isinstance(item, dict):
+                yield item
+
+
 # ---------- prompt parsing + tokenization ----------
 
 RE_NEG_MARKER = re.compile(r"\bNegative prompt:\s*", re.IGNORECASE)
@@ -122,6 +164,131 @@ RE_TAIL_ANY = re.compile(
     r"(?:Steps:|Sampler:|CFG\s*scale:|Seed:|Size:|Model hash:|Model:|Denoising strength:|Hires|Clip skip:|Created Date:|Civitai resources:|Civitai metadata:|Hashes:)\s*",
     re.IGNORECASE,
 )
+
+A1111_MARKERS = (
+    "steps:",
+    "sampler:",
+    "cfg scale:",
+    "seed:",
+    "size:",
+    "model hash:",
+    "model:",
+    "denoising strength:",
+    "clip skip:",
+    "hires",
+    "lora:",
+    "<lora:",
+)
+
+def looks_like_a1111_text(s: str) -> bool:
+    low = s.lower()
+    return any(m in low for m in A1111_MARKERS) or ("negative prompt:" in low)
+
+
+def _to_int(x: Any) -> Optional[int]:
+    try:
+        if isinstance(x, bool):
+            return None
+        if x is None or x == "":
+            return None
+        return int(float(x))
+    except Exception:
+        return None
+
+
+def _to_float(x: Any) -> Optional[float]:
+    try:
+        if isinstance(x, bool):
+            return None
+        if x is None or x == "":
+            return None
+        return float(x)
+    except Exception:
+        return None
+
+
+def _looks_like_sampler(s: str) -> bool:
+    low = s.lower()
+    tokens = ("euler", "dpm", "ddim", "heun", "lms", "uni", "plms", "ancestral")
+    return any(t in low for t in tokens)
+
+
+def parse_ksampler_widgets(values: List[Any]) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+
+    for v in values:
+        if isinstance(v, str):
+            if _looks_like_sampler(v) and "sampler" not in out:
+                out["sampler"] = v
+            if v.lower() in SCHEDULER_MAP and "scheduler" not in out:
+                out["scheduler"] = v
+
+    for v in values:
+        i = _to_int(v)
+        if i is None:
+            continue
+        if i >= 10000 and "seed" not in out:
+            out["seed"] = i
+            continue
+        if 1 <= i <= 200 and "steps" not in out:
+            out["steps"] = i
+
+    for v in values:
+        f = _to_float(v)
+        if f is None:
+            continue
+        if 0.1 <= f <= 30 and "cfg_scale" not in out:
+            if out.get("steps") == int(f) or out.get("seed") == int(f):
+                continue
+            out["cfg_scale"] = f
+
+    return out
+
+
+def extract_comfyui_params(workflow: Any) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+
+    for node in iter_node_dicts(workflow):
+        ct_raw = node.get("class_type") or node.get("type") or ""
+        ct = str(ct_raw).lower()
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+
+        if ("checkpoint" in ct and ("loader" in ct or "load" in ct)) and "model" not in out:
+            model = inputs.get("ckpt_name") or inputs.get("model_name") or inputs.get("checkpoint")
+            if isinstance(model, str) and model.strip():
+                out["model"] = model.strip()
+
+        if "ksampler" in ct:
+            params: Dict[str, Any] = {}
+            if isinstance(inputs, dict):
+                seed = _to_int(inputs.get("seed"))
+                steps = _to_int(inputs.get("steps"))
+                cfg = _to_float(inputs.get("cfg") or inputs.get("cfg_scale"))
+                sampler = inputs.get("sampler_name") or inputs.get("sampler")
+                scheduler = inputs.get("scheduler")
+                if seed is not None:
+                    params["seed"] = seed
+                if steps is not None:
+                    params["steps"] = steps
+                if cfg is not None:
+                    params["cfg_scale"] = cfg
+                if isinstance(sampler, str) and sampler.strip():
+                    params["sampler"] = sampler.strip()
+                if isinstance(scheduler, str) and scheduler.strip():
+                    params["scheduler"] = scheduler.strip()
+
+            widgets = node.get("widgets_values")
+            if isinstance(widgets, list):
+                wparams = parse_ksampler_widgets(widgets)
+                for k, v in wparams.items():
+                    if k not in params or params.get(k) in (None, ""):
+                        params[k] = v
+
+            for k, v in params.items():
+                if v not in (None, "") and out.get(k) in (None, ""):
+                    out[k] = v
+
+    return out
 
 def cut_at_tail_markers(s: str) -> str:
     m = RE_TAIL_ANY.search(s)
@@ -423,11 +590,14 @@ TEXT_CANDIDATE_KEYS = [
     "XMP:Subject",
     "XMP:CreatorTool",
     "EXIF:UserComment",
+    "ExifIFD:UserComment",
     "EXIF:ImageDescription",
     "EXIF:Software",
     "IPTC:Caption-Abstract",
     "IPTC:Keywords",
     "EXIF:DocumentName",
+    "IFD0:ImageDescription",
+    "IFD0:Software",
 ]
 
 RE_A1111_SIZE = re.compile(r"\bSize:\s*(\d+)\s*x\s*(\d+)\b", re.IGNORECASE)
@@ -593,6 +763,11 @@ def parse_comfyui_embedded_json(blob: Any) -> Optional[Dict[str, Any]]:
         rec["prompt"] = pair[0]
         rec["negative_prompt"] = pair[1]
 
+    params = extract_comfyui_params(blob)
+    for k, v in params.items():
+        if v not in (None, "") and rec.get(k) in (None, ""):
+            rec[k] = v
+
     return rec
 
 
@@ -659,12 +834,16 @@ def normalize_record(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
             rec["kv"]["workflow_json"] = wf
         rec["workflow_json"] = wf  # keep in JSONL export
 
-        for fld in ("seed", "steps", "width", "height"):
+        for fld in ("seed", "steps", "width", "height", "sampler", "scheduler", "model"):
             if fld in comfy and rec.get(fld) in (None, ""):
-                try:
-                    rec[fld] = int(float(comfy[fld]))
-                except Exception:
-                    pass
+                if fld in ("sampler", "scheduler", "model"):
+                    if isinstance(comfy[fld], str):
+                        rec[fld] = comfy[fld]
+                else:
+                    try:
+                        rec[fld] = int(float(comfy[fld]))
+                    except Exception:
+                        pass
 
         # cfg can be stored as cfg or cfg_scale
         if "cfg_scale" in comfy and rec.get("cfg_scale") in (None, ""):
@@ -686,20 +865,20 @@ def normalize_record(exif_obj: Dict[str, Any]) -> Dict[str, Any]:
 
         break
 
-    # Try A1111-like parameters text
-    if rec["format_hint"] is None:
-        for k, v in blobs:
-            if not isinstance(v, str):
-                continue
-            low = v.lower()
-            if ("steps:" in low and "sampler:" in low) or ("negative prompt:" in low):
-                parsed = parse_a1111_parameters(v)
-                rec["format_hint"] = parsed.get("format_hint")
+    # Try A1111-like parameters text (also when workflow JSON exists)
+    for k, v in blobs:
+        if not isinstance(v, str):
+            continue
+        if looks_like_a1111_text(v):
+            parsed = parse_a1111_parameters(v)
+            if parsed.get("raw_text") and not rec.get("raw_text_preview"):
                 rec["raw_text_preview"] = parsed.get("raw_text")
-                for fld in ("prompt", "negative_prompt", "steps", "cfg_scale", "seed", "width", "height", "sampler", "scheduler", "model"):
-                    if fld in parsed and parsed[fld] not in (None, ""):
-                        rec[fld] = parsed[fld]
-                break
+            if parsed.get("format_hint") and rec.get("format_hint") in (None, "comfyui_like"):
+                rec["format_hint"] = parsed.get("format_hint")
+            for fld in ("prompt", "negative_prompt", "steps", "cfg_scale", "seed", "width", "height", "sampler", "scheduler", "model"):
+                if fld in parsed and parsed[fld] not in (None, "") and rec.get(fld) in (None, ""):
+                    rec[fld] = parsed[fld]
+            break
 
     if rec["raw_text_preview"] is None and blobs:
         rec["raw_text_preview"] = str(blobs[0][1])[:2000]
@@ -797,25 +976,70 @@ def upsert_record(conn: sqlite3.Connection, rec: Dict[str, Any]) -> None:
         )
 
 
-def write_csv(csv_path: str, records: List[Dict[str, Any]]) -> None:
+def load_jsonl(path: str) -> List[Dict[str, Any]]:
+    if not os.path.exists(path):
+        return []
+    out: List[Dict[str, Any]] = []
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                out.append(json.loads(line))
+            except Exception:
+                continue
+    return out
+
+
+def merge_missing_values(target: Dict[str, Any], source: Dict[str, Any]) -> None:
+    for k, v in source.items():
+        if k in target and isinstance(target[k], dict) and isinstance(v, dict):
+            merge_missing_values(target[k], v)
+        elif k not in target or target[k] in (None, ""):
+            target[k] = v
+
+
+def normalize_key(value: Optional[str]) -> str:
+    if not value:
+        return ""
+    return str(value).replace("\\", "/").lower()
+
+
+def record_key(rec: Dict[str, Any]) -> str:
+    return normalize_key(rec.get("source_file") or rec.get("file_name"))
+
+
+def merge_record_lists(
+    new_records: List[Dict[str, Any]],
+    old_records: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    old_by_key = {record_key(r): r for r in old_records if record_key(r)}
+    old_by_name = {}
+    for r in old_records:
+        name = r.get("file_name")
+        if name and name not in old_by_name:
+            old_by_name[name] = r
+
+    for rec in new_records:
+        key = record_key(rec)
+        old = old_by_key.get(key) or old_by_name.get(rec.get("file_name"))
+        if old:
+            merge_missing_values(rec, old)
+
+    new_keys = {record_key(r) for r in new_records if record_key(r)}
+    missing = [r for k, r in old_by_key.items() if k not in new_keys]
+    return new_records + missing
+
+
+def compute_csv_columns(records: List[Dict[str, Any]]) -> List[str]:
+    extra = sorted({k for r in records for k in r.keys()} - set(CSV_COLUMNS))
+    return CSV_COLUMNS + extra
+
+
+def write_csv(csv_path: str, records: List[Dict[str, Any]], columns: Optional[List[str]] = None) -> None:
     os.makedirs(os.path.dirname(csv_path), exist_ok=True)
-    cols = [
-        "id",
-        "source_file",
-        "file_name",
-        "ext",
-        "width",
-        "height",
-        "format_hint",
-        "model",
-        "sampler",
-        "scheduler",
-        "steps",
-        "cfg_scale",
-        "seed",
-        "prompt",
-        "negative_prompt",
-    ]
+    cols = columns or CSV_COLUMNS
     with open(csv_path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=cols)
         w.writeheader()
@@ -844,9 +1068,7 @@ def main():
     records: List[Dict[str, Any]] = []
     os.makedirs(os.path.dirname(out_jsonl), exist_ok=True)
 
-    with open(in_jsonl, "r", encoding="utf-8-sig") as f_in, open(
-        out_jsonl, "w", encoding="utf-8"
-    ) as f_out, sqlite3.connect(db_path) as conn:
+    with open(in_jsonl, "r", encoding="utf-8-sig") as f_in, sqlite3.connect(db_path) as conn:
 
         conn.execute("PRAGMA foreign_keys=ON;")
 
@@ -858,13 +1080,28 @@ def main():
             exif_obj = json.loads(line)
             rec = normalize_record(exif_obj)
             upsert_record(conn, rec)
-            f_out.write(json.dumps(rec, ensure_ascii=False) + "\n")
             records.append(rec)
 
         conn.commit()
 
-    write_csv(str(out_csv), records)
-    print(f"Done.\nDB: {db_path}\nJSONL: {out_jsonl}\nCSV: {out_csv}\nRecords: {len(records)}")
+    old_csv_records: List[Dict[str, Any]] = []
+    if out_csv.exists():
+        with open(out_csv, "r", encoding="utf-8") as f_old:
+            old_csv_records = list(csv.DictReader(f_old))
+
+    old_jsonl_records = load_jsonl(str(out_jsonl))
+
+    merged_jsonl = merge_record_lists([dict(r) for r in records], old_jsonl_records)
+    merged_csv = merge_record_lists([dict(r) for r in records], old_csv_records)
+
+    columns = compute_csv_columns(old_csv_records + merged_csv)
+
+    with open(out_jsonl, "w", encoding="utf-8") as f_out:
+        for rec in merged_jsonl:
+            f_out.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    write_csv(str(out_csv), merged_csv, columns)
+    print(f"Done.\nDB: {db_path}\nJSONL: {out_jsonl}\nCSV: {out_csv}\nRecords: {len(merged_csv)}")
 
 
 if __name__ == "__main__":
