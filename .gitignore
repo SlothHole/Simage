@@ -7,3 +7,14 @@
 
 # Ignore archived outputs used for reference
 /old_out_not_use/*
+
+# Ignore local virtual environment
+/.venv/*
+
+# Ignore thumbnails cache
+/.thumbnails/*
+!/.thumbnails/.gitkeep
+
+# Ignore pytest temp directory
+/.pytest_tmp/*
+/.pytest_tmp_work/*

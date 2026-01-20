@@ -12,3 +12,7 @@ include = ["simage*"]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
+[tool.pytest.ini_options]
+cache_dir = ".venv/.pytest_cache"
+addopts = "-p no:cacheprovider"
+

@@ -13,26 +13,37 @@ Local pipeline for extracting AI image metadata and normalizing into SQLite.
 - simage/utils/paths.py: repo-root path helpers
 - simage/data/schema.sql: SQLite schema
 - simage/ui/: PySide UI
-- scripts/run.ps1, scripts/run.cmd: convenience runners
+- run.ps1, run.cmd, run.sh: convenience runners
 - Input/: source images
 - out/: generated outputs
-
-## Naming
-
-- Legacy stubs in `simage/legacy/stubs` use `<module>.stub.txt` and include `moved_to` + `module` mappings.
 
 ## Setup
 
 - Python 3.11+
-- ExifTool on PATH (or pass --exiftool)
+- ExifTool on PATH (or pass --exiftool). Bundled ExifTool is included in `exiftool-13.45_64/`.
 - Optional UI deps: simage/ui/requirements.txt
+
+## Run
+
+```powershell
+.\run.ps1
+```
+
+```cmd
+run.cmd
+```
+
+```bash
+chmod +x ./run.sh
+./run.sh
+```
 
 ## Pipeline
 
 1) Extract EXIF JSONL
 
 ```powershell
-python -m simage.core.exif --input Input --out out/exif_raw.jsonl
+python -m simage.core.exif --input Input --out out/exif_raw.jsonl --exiftool .\exiftool-13.45_64\ExifTool.exe
 ```
 
 2) Ingest + normalize
@@ -71,6 +82,13 @@ python -m simage.core.wildcards tokens --db out/images.db --out out/wildcards/po
 pip install -r simage/ui/requirements.txt
 python -m simage.ui.app
 ```
+
+UI features:
+- Import: copy images recursively from a chosen folder into `Input/`.
+- Refresh: reruns EXIF + full pipeline for newly imported images.
+- Gallery: keeps thumbnails for missing originals (missing images still show).
+- DB Viewer tab: run read-only SQL against `out/images.db`.
+- Thumbnail cache: stored in `/.thumbnails` (contents ignored by git).
 
 ## Tests
 

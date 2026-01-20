@@ -1,13 +1,12 @@
 import os
-import tempfile
 
 from simage.ui.change_log import ChangeLogger
 
-def test_change_logger_log_and_recover():
+def test_change_logger_log_and_recover(tmp_path):
     # Use a temp log file
     orig_log = ChangeLogger.LOG_PATH
-    with tempfile.TemporaryDirectory() as tmp:
-        ChangeLogger.LOG_PATH = os.path.join(tmp, "unsaved_changes.log")
+    try:
+        ChangeLogger.LOG_PATH = os.fspath(tmp_path / "unsaved_changes.log")
         # Log a change
         change = {"type": "tag", "img": "img1.png", "tags": ["cat"]}
         ChangeLogger.log_change(change)
@@ -17,13 +16,15 @@ def test_change_logger_log_and_recover():
         # Clear and check
         ChangeLogger.clear()
         assert ChangeLogger.load_changes() == []
-    ChangeLogger.LOG_PATH = orig_log
+    finally:
+        ChangeLogger.LOG_PATH = orig_log
 
-def test_change_logger_handles_corrupt():
+def test_change_logger_handles_corrupt(tmp_path):
     orig_log = ChangeLogger.LOG_PATH
-    with tempfile.TemporaryDirectory() as tmp:
-        ChangeLogger.LOG_PATH = os.path.join(tmp, "unsaved_changes.log")
-        with open(ChangeLogger.LOG_PATH, "w") as f:
+    try:
+        ChangeLogger.LOG_PATH = os.fspath(tmp_path / "unsaved_changes.log")
+        with open(ChangeLogger.LOG_PATH, "w", encoding="utf-8") as f:
             f.write("not json")
         assert ChangeLogger.load_changes() == []
-    ChangeLogger.LOG_PATH = orig_log
+    finally:
+        ChangeLogger.LOG_PATH = orig_log

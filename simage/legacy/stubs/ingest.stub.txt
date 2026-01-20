@@ -1,3 +1,0 @@
-stub: ingest
-moved_to: simage/core/ingest.py
-module: simage.core.ingest
