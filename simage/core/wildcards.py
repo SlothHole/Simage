@@ -1,4 +1,4 @@
-# export_wildcards.py
+# wildcards.py
 # Purpose: Export prompts/tokens/resources/kv values (or any SQL query) to a newline-delimited
 #          text file suitable for SD/ComfyUI wildcard lists.
 
@@ -8,7 +8,9 @@ import re
 import sqlite3
 from typing import Iterable, List, Optional, Tuple
 
-from simage.path_utils import resolve_repo_path
+from simage.utils.paths import resolve_repo_path
+
+
 def connect(db_path: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

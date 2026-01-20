@@ -1,18 +1,19 @@
 """
-SimageUI main entrypoint.
+Simage UI entrypoint.
 A fast, multi-tab image pipeline UI for the Simage project.
 """
 
-import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
-from PySide6.QtCore import Qt
-
-from ui_gallery import GalleryTab
-#from ui_edit import EditTab
-#from ui_batch import BatchTab
-#from ui_settings import SettingsTab
-#from ui_viewer import ViewerTab
 import os
+import sys
+
+from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
+
+from simage.utils.paths import resolve_repo_path
+from .gallery import GalleryTab
+# from .edit import EditTab
+# from .batch import BatchTab
+# from .settings import SettingsTab
+# from .viewer import ViewerTab
 
 class SimageUIMain(QMainWindow):
     def __init__(self):
@@ -45,12 +46,21 @@ class SimageUIMain(QMainWindow):
 
 
 # --- TagTab implementation ---
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QTextEdit, QListWidget, QHBoxLayout, QLineEdit, QMessageBox
+from PySide6.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QListWidget,
+    QHBoxLayout,
+    QLineEdit,
+    QMessageBox,
+)
 from PySide6.QtCore import Qt
 
-
-from SimageUI.amend_csv import amend_records_csv
-from SimageUI.change_logger import ChangeLogger
+from .csv_edit import amend_records_csv
+from .change_log import ChangeLogger
 
 
 class TagTab(QWidget):
@@ -58,7 +68,7 @@ class TagTab(QWidget):
         super().__init__(parent)
         self.tags = {}  # {image_path: [tags]}
         self.renames = {}  # {old_path: new_path}
-        self.csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "out", "records.csv")
+        self.csv_path = str(resolve_repo_path("out/records.csv", must_exist=False, allow_absolute=False))
         layout = QVBoxLayout(self)
         self.setLayout(layout)
 

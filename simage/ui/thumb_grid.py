@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QWidget, QScrollArea, QGridLayout, QLabel, QSizePo
 from PySide6.QtCore import Qt, QSize, Signal, QRect, QEvent
 from PySide6.QtGui import QPixmap
 import os
-from image_scanner import ensure_thumbnails_for_folder
+from .scanner import ensure_thumbnails_for_folder
 
 
 

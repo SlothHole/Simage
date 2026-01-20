@@ -1,19 +1,27 @@
 """
-Gallery/Search tab for SimageUI.
+Gallery/search tab for Simage UI.
 Fast, scrollable, async thumbnail grid for large image sets.
 """
 
+import os
 
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QSplitter, QSizePolicy, QTextEdit, QFrame
+from PySide6.QtWidgets import (
+    QWidget,
+    QHBoxLayout,
+    QVBoxLayout,
+    QLabel,
+    QSplitter,
+    QSizePolicy,
+    QTextEdit,
+    QFrame,
+    QLineEdit,
+    QPushButton,
+)
 from PySide6.QtCore import Qt
 
-from thumbnail_grid import ThumbnailGrid
-from SimageUI.records_filter import load_records, filter_records, filter_by_tags
-from PySide6.QtWidgets import QLineEdit, QPushButton, QHBoxLayout
-
-
-
-
+from simage.utils.paths import resolve_repo_path
+from .thumb_grid import ThumbnailGrid
+from .record_filter import load_records, filter_records, filter_by_tags
 class GalleryTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -89,8 +97,9 @@ class GalleryTab(QWidget):
         self.update_grid()
 
     def export_selected(self):
-        import shutil, json
-        from SimageUI.thumbnailer import ensure_thumbnail, THUMB_DIR
+        import json
+        import shutil
+        from .thumbnails import ensure_thumbnail, THUMB_DIR
         if not self.selected_images:
             return
         export_dir = "exported_images"
@@ -139,7 +148,7 @@ class GalleryTab(QWidget):
         self.setLayout(main_layout)
 
         # Load all records for filtering
-        self.csv_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "out", "records.csv")
+        self.csv_path = str(resolve_repo_path("out/records.csv", must_exist=False, allow_absolute=False))
         self.all_records = load_records(self.csv_path)
         self.filtered_records = self.all_records
         self.selected_images = []
@@ -152,7 +161,7 @@ class GalleryTab(QWidget):
         tags = [t.strip() for t in self.batch_tag_input.text().split(",") if t.strip()]
         if not self.selected_images or not tags:
             return
-        from SimageUI.amend_csv import amend_records_csv
+        from .csv_edit import amend_records_csv
         updates = []
         for img_path in self.selected_images:
             fname = os.path.basename(img_path)
@@ -171,8 +180,8 @@ class GalleryTab(QWidget):
         base = self.batch_rename_input.text().strip()
         if not self.selected_images or not base:
             return
-        from SimageUI.amend_csv import amend_records_csv
-        from SimageUI.thumbnailer import ensure_thumbnail, THUMB_DIR
+        from .csv_edit import amend_records_csv
+        from .thumbnails import ensure_thumbnail, THUMB_DIR
         updates = []
         for i, img_path in enumerate(self.selected_images):
             fname = os.path.basename(img_path)
@@ -200,7 +209,7 @@ class GalleryTab(QWidget):
         target = self.batch_move_input.text().strip()
         if not self.selected_images or not target:
             return
-        from SimageUI.thumbnailer import ensure_thumbnail, THUMB_DIR
+        from .thumbnails import ensure_thumbnail, THUMB_DIR
         os.makedirs(target, exist_ok=True)
         for img_path in self.selected_images:
             fname = os.path.basename(img_path)
