@@ -9,3 +9,7 @@ A fast, user-friendly, multi-tab image pipeline UI for the Simage project.
 ## Getting Started
 
 (Instructions will be added as the UI is developed)
+
+## Placeholders
+
+- Edit, batch, settings, and viewer tabs are present as placeholders and show an Info message until implemented.
