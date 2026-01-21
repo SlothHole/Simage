@@ -25,6 +25,7 @@ class ThumbnailGrid(QWidget):
         self.thumbs = []
         self.image_paths = []
         self.selected_indices = set()
+        self.last_selected_index = -1
         self._pixmap_cache = {}
         self._pixmap_cache_order = deque()
         self._pixmap_cache_max = 256
@@ -59,6 +60,7 @@ class ThumbnailGrid(QWidget):
 
     def clear_selection(self):
         self.selected_indices.clear()
+        self.last_selected_index = -1
         self.update_visible_thumbnails()
         self.images_selected.emit([])
 
@@ -206,7 +208,23 @@ class ThumbnailGrid(QWidget):
         def handler(event):
             self.setFocus()
             if 0 <= idx < len(self.thumbs):
-                if event.modifiers() & Qt.ControlModifier:
+                mods = event.modifiers()
+                if mods & Qt.ShiftModifier:
+                    anchor = self.last_selected_index
+                    if anchor < 0:
+                        anchor = idx
+                    start = min(anchor, idx)
+                    end = max(anchor, idx)
+                    range_set = set(range(start, end + 1))
+                    if mods & Qt.ControlModifier:
+                        self.selected_indices.update(range_set)
+                    else:
+                        self.selected_indices = range_set
+                    self.update_visible_thumbnails()
+                    img_path = self._image_path_for_index(idx)
+                    self.image_selected.emit(img_path, self.thumbs[idx])
+                    self.images_selected.emit(self.get_selected_images())
+                elif mods & Qt.ControlModifier:
                     # Toggle selection
                     if idx in self.selected_indices:
                         self.selected_indices.remove(idx)
@@ -220,6 +238,7 @@ class ThumbnailGrid(QWidget):
                     img_path = self._image_path_for_index(idx)
                     self.image_selected.emit(img_path, self.thumbs[idx])
                     self.images_selected.emit(self.get_selected_images())
+                self.last_selected_index = idx
         return handler
 
     def keyPressEvent(self, event):
@@ -253,6 +272,7 @@ class ThumbnailGrid(QWidget):
             return super().keyPressEvent(event)
 
         self.selected_indices = {new_idx}
+        self.last_selected_index = new_idx
         self.update_visible_thumbnails()
         self._ensure_visible(new_idx)
         img_path = self._image_path_for_index(new_idx)
