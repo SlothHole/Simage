@@ -12,6 +12,7 @@ from PySide6.QtGui import QColor, QTextCharFormat, QTextCursor, QTextDocument
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QGroupBox,
     QLabel,
     QHBoxLayout,
     QAbstractItemView,
@@ -25,6 +26,8 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QToolButton,
     QVBoxLayout,
+    QScrollArea,
+    QFrame,
     QWidget,
     QSplitter,
 )
@@ -94,20 +97,25 @@ class EditTab(QWidget):
         self.anchor_status_label = QLabel("Anchor: none")
 
         self.selected_list = QListWidget()
+        self.selected_list.setMinimumHeight(0)
         self.selected_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.selected_list.itemSelectionChanged.connect(self._on_selected_item_changed)
 
         self.node_list = QListWidget()
+        self.node_list.setMinimumHeight(0)
         self.node_list.setSelectionMode(QAbstractItemView.SingleSelection)
         self.node_list.itemSelectionChanged.connect(self._on_node_selected)
 
         self.field_list = QListWidget()
+        self.field_list.setMinimumHeight(0)
         self.field_list.setSelectionMode(QAbstractItemView.SingleSelection)
 
         self.find_results = QListWidget()
+        self.find_results.setMinimumHeight(0)
         self.find_results.itemSelectionChanged.connect(self._on_result_selected)
 
         self.anchor_results = QListWidget()
+        self.anchor_results.setMinimumHeight(0)
         self.anchor_results.itemSelectionChanged.connect(self._on_anchor_result_selected)
 
         self.workflow_view = QTextEdit()
@@ -115,33 +123,30 @@ class EditTab(QWidget):
         self.workflow_view.selectionChanged.connect(self._on_workflow_selection_changed)
 
         main_splitter = QSplitter(Qt.Horizontal)
-        left_splitter = QSplitter(Qt.Vertical)
 
-        selected_panel = QWidget()
+        selected_panel = QGroupBox("Selected Images")
         selected_layout = QVBoxLayout(selected_panel)
         self._apply_section_layout(selected_layout)
         selected_header = QHBoxLayout()
-        selected_header.addWidget(QLabel("Selected Images"))
         self.selected_label = QLabel("Selected: 0")
         selected_header.addWidget(self.selected_label)
+        selected_header.addStretch(1)
         selected_header.addWidget(
             self._help_button("Shows how many images are currently selected.")
         )
-        selected_header.addStretch(1)
         selected_layout.addLayout(selected_header)
         selected_layout.addWidget(QLabel("Click an image to load its workflow."))
         selected_layout.addWidget(self.selected_list)
 
-        matches_panel = QWidget()
+        matches_panel = QGroupBox("Find Text")
         matches_layout = QVBoxLayout(matches_panel)
         self._apply_section_layout(matches_layout)
-        matches_header = QHBoxLayout()
-        matches_header.addWidget(QLabel("Find Text"))
-        matches_header.addWidget(
+        matches_help = QHBoxLayout()
+        matches_help.addStretch(1)
+        matches_help.addWidget(
             self._help_button("Select text in Workflow and it will find matches (if enabled).")
         )
-        matches_header.addStretch(1)
-        matches_layout.addLayout(matches_header)
+        matches_layout.addLayout(matches_help)
         find_row = QHBoxLayout()
         find_row.addWidget(self.find_input)
         find_row.addWidget(self.find_btn)
@@ -160,16 +165,15 @@ class EditTab(QWidget):
         matches_layout.addWidget(QLabel("Matches"))
         matches_layout.addWidget(self.find_results)
 
-        anchor_panel = QWidget()
+        anchor_panel = QGroupBox("Anchor by Node")
         anchor_layout = QVBoxLayout(anchor_panel)
         self._apply_section_layout(anchor_layout)
-        anchor_header = QHBoxLayout()
-        anchor_header.addWidget(QLabel("Anchor by Node"))
-        anchor_header.addWidget(
+        anchor_help = QHBoxLayout()
+        anchor_help.addStretch(1)
+        anchor_help.addWidget(
             self._help_button("Pick a node and field from the current workflow.")
         )
-        anchor_header.addStretch(1)
-        anchor_layout.addLayout(anchor_header)
+        anchor_layout.addLayout(anchor_help)
         anchor_layout.addWidget(QLabel("Choose a node, then a field to anchor."))
 
         node_row = QHBoxLayout()
@@ -194,39 +198,46 @@ class EditTab(QWidget):
         anchor_layout.addWidget(QLabel("Anchor Results"))
         anchor_layout.addWidget(self.anchor_results)
 
-        left_splitter.addWidget(selected_panel)
-        left_splitter.addWidget(anchor_panel)
-        left_splitter.addWidget(matches_panel)
-        self._init_splitter(left_splitter, "edit/left", [220, 360, 240])
+        left_container = QWidget()
+        left_layout = QVBoxLayout(left_container)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(20)
+        left_layout.addWidget(selected_panel)
+        left_layout.addWidget(anchor_panel)
+        left_layout.addWidget(matches_panel)
+        left_layout.addStretch(1)
 
-        workflow_panel = QWidget()
+        left_scroll = QScrollArea()
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setFrameShape(QFrame.NoFrame)
+        left_scroll.setWidget(left_container)
+
+        workflow_panel = QGroupBox("Workflow")
         workflow_layout = QVBoxLayout(workflow_panel)
         self._apply_section_layout(workflow_layout)
-        workflow_header = QHBoxLayout()
-        workflow_header.addWidget(QLabel("Workflow"))
-        workflow_header.addWidget(
+        workflow_help = QHBoxLayout()
+        workflow_help.addStretch(1)
+        workflow_help.addWidget(
             self._help_button("Select text here to find matching sections across images.")
         )
-        workflow_header.addStretch(1)
-        workflow_layout.addLayout(workflow_header)
+        workflow_layout.addLayout(workflow_help)
         workflow_layout.addWidget(self.workflow_view)
 
-        main_splitter.addWidget(left_splitter)
+        main_splitter.addWidget(left_scroll)
         main_splitter.addWidget(workflow_panel)
         main_splitter.setStretchFactor(0, 1)
         main_splitter.setStretchFactor(1, 3)
         self._init_splitter(main_splitter, "edit/main", [360, 840])
 
-        file_actions_panel = QWidget()
+        file_actions_panel = QGroupBox("File Actions")
         file_actions_layout = QVBoxLayout(file_actions_panel)
         self._apply_section_layout(file_actions_layout)
-        file_header = QHBoxLayout()
-        file_header.addWidget(QLabel("File Actions"))
-        file_header.addWidget(
+        file_help = QHBoxLayout()
+        file_help.addStretch(1)
+        file_help.addWidget(
             self._help_button("Strip embedded metadata so files can be reparsed.")
         )
-        file_header.addStretch(1)
-        file_actions_layout.addLayout(file_header)
+        file_actions_layout.addLayout(file_help)
 
         options_row = QHBoxLayout()
         self.keep_backup_check = QCheckBox("Keep backup (.original)")
@@ -267,16 +278,15 @@ class EditTab(QWidget):
             self.edit_seed,
         ]
 
-        edit_settings_panel = QWidget()
+        edit_settings_panel = QGroupBox("Edit Settings")
         edit_settings_layout = QVBoxLayout(edit_settings_panel)
         self._apply_section_layout(edit_settings_layout)
-        edit_header = QHBoxLayout()
-        edit_header.addWidget(QLabel("Edit Settings"))
-        edit_header.addWidget(
+        edit_help = QHBoxLayout()
+        edit_help.addStretch(1)
+        edit_help.addWidget(
             self._help_button("Update key metadata fields in records.jsonl.")
         )
-        edit_header.addStretch(1)
-        edit_settings_layout.addLayout(edit_header)
+        edit_settings_layout.addLayout(edit_help)
         self.edit_active_label = QLabel("Editing: none")
         edit_settings_layout.addWidget(self.edit_active_label)
 
@@ -314,16 +324,15 @@ class EditTab(QWidget):
         edit_settings_layout.addLayout(edit_actions)
         edit_settings_layout.addStretch(1)
 
-        details_panel = QWidget()
+        details_panel = QGroupBox("Image Details")
         details_layout = QVBoxLayout(details_panel)
         self._apply_section_layout(details_layout)
-        details_header = QHBoxLayout()
-        details_header.addWidget(QLabel("Image Details"))
-        details_header.addWidget(
+        details_help = QHBoxLayout()
+        details_help.addStretch(1)
+        details_help.addWidget(
             self._help_button("Metadata loaded from records.jsonl and workflow JSON.")
         )
-        details_header.addStretch(1)
-        details_layout.addLayout(details_header)
+        details_layout.addLayout(details_help)
         self.details_name_label = QLabel("Image: none")
         details_layout.addWidget(self.details_name_label)
         ip_row = QHBoxLayout()
@@ -393,12 +402,12 @@ class EditTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(28)
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)

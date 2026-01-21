@@ -9,7 +9,7 @@ import os
 import sys
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget
+from PySide6.QtWidgets import QApplication, QMainWindow, QSizePolicy, QTabWidget
 
 from simage.utils.paths import resolve_repo_path
 from .gallery import GalleryTab
@@ -51,6 +51,7 @@ class SimageUIMain(QMainWindow):
         self.tabs.addTab(SettingsTab(self, gallery_tab, batch_tab), "Settings")
         self.tabs.addTab(ViewerTab(self), "Full Image Viewer")
         self.tabs.addTab(DatabaseViewerTab(self), "DB Viewer")
+        self._allow_minimum_window_size()
         self._restore_window_geometry()
 
     def closeEvent(self, event):
@@ -61,6 +62,16 @@ class SimageUIMain(QMainWindow):
         geometry = load_window_geometry("main")
         if geometry:
             self.restoreGeometry(geometry)
+
+    def _allow_minimum_window_size(self) -> None:
+        self.setMinimumSize(0, 0)
+        self.tabs.setMinimumSize(0, 0)
+        self.tabs.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        for idx in range(self.tabs.count()):
+            widget = self.tabs.widget(idx)
+            if widget:
+                widget.setMinimumSize(0, 0)
+                widget.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
 
 # --- TagTab implementation ---
@@ -118,7 +129,7 @@ class TagTab(QWidget):
         top_container = QWidget()
         top_layout = QHBoxLayout(top_container)
         top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.setSpacing(12)
+        top_layout.setSpacing(20)
 
         # Image list panel
         image_panel = QWidget()
@@ -160,7 +171,7 @@ class TagTab(QWidget):
         create_add_widget = QWidget()
         create_add_layout = QHBoxLayout(create_add_widget)
         create_add_layout.setContentsMargins(0, 0, 0, 0)
-        create_add_layout.setSpacing(12)
+        create_add_layout.setSpacing(20)
 
         # Create new tag panel
         new_panel = QWidget()
@@ -234,7 +245,7 @@ class TagTab(QWidget):
         edit_widget = QWidget()
         edit_layout = QHBoxLayout(edit_widget)
         edit_layout.setContentsMargins(0, 0, 0, 0)
-        edit_layout.setSpacing(12)
+        edit_layout.setSpacing(20)
 
         # Edit tag panel
         edit_panel = QWidget()
@@ -314,12 +325,12 @@ class TagTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(32, 32, 32, 32)
-        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(28)
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
     def _save_splitter(self, splitter: QSplitter, key: str) -> None:
         save_splitter_sizes(key, splitter.sizes())

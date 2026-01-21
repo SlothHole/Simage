@@ -184,7 +184,7 @@ class GalleryTab(QWidget):
         preview_layout.addLayout(preview_header)
         self.image_preview = QLabel("No image selected")
         self.image_preview.setAlignment(Qt.AlignCenter)
-        self.image_preview.setMinimumSize(256, 256)
+        self.image_preview.setMinimumSize(0, 0)
         self.image_preview.setFrameShape(QFrame.Box)
         self.image_preview.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         preview_layout.addWidget(self.image_preview)
@@ -246,12 +246,12 @@ class GalleryTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QHBoxLayout) -> None:
-        layout.setContentsMargins(32, 32, 32, 32)
-        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(28)
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(12)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)

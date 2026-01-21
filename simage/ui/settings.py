@@ -9,12 +9,14 @@ from PySide6.QtWidgets import (
     QComboBox,
     QColorDialog,
     QFontDialog,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QTabWidget,
     QToolButton,
@@ -91,18 +93,29 @@ class SettingsTab(QWidget):
         custom_group = QGroupBox("Custom Colors")
         custom_layout = QVBoxLayout(custom_group)
         self._apply_section_layout(custom_layout)
-        grid = QGridLayout()
+        custom_scroll = QScrollArea()
+        custom_scroll.setWidgetResizable(True)
+        custom_scroll.setFrameShape(QFrame.NoFrame)
+        custom_body = QWidget()
+        custom_grid = QGridLayout(custom_body)
+        custom_grid.setContentsMargins(12, 12, 12, 12)
+        custom_grid.setHorizontalSpacing(16)
+        custom_grid.setVerticalSpacing(12)
         row = 0
         for label_text, section, key in self._custom_color_entries():
             label = QLabel(label_text)
+            label.setMinimumWidth(0)
             button = QPushButton()
             self._standard_button(button)
+            button.setMinimumWidth(0)
             button.clicked.connect(lambda _, s=section, k=key: self._pick_custom_color(s, k))
-            grid.addWidget(label, row, 0)
-            grid.addWidget(button, row, 1)
+            custom_grid.addWidget(label, row, 0)
+            custom_grid.addWidget(button, row, 1)
             self._color_buttons[(section, key)] = button
             row += 1
-        custom_layout.addLayout(grid)
+        custom_body.setLayout(custom_grid)
+        custom_scroll.setWidget(custom_body)
+        custom_layout.addWidget(custom_scroll)
         display_layout.addWidget(custom_group)
 
         self.reset_display_btn = QPushButton("Reset display settings")
@@ -237,16 +250,16 @@ class SettingsTab(QWidget):
         button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(28)
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
     def _apply_tab_layout(self, layout: QVBoxLayout) -> None:
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
+        layout.setSpacing(28)
 
     def _on_theme_changed(self, theme_name: str) -> None:
         if not self._display_ready:

@@ -64,7 +64,7 @@ class DatabaseViewerTab(QWidget):
 
         table_row = QHBoxLayout()
         self.table_combo = QComboBox()
-        self.table_combo.setMinimumWidth(220)
+        self.table_combo.setMinimumWidth(0)
         refresh_tables_btn = QPushButton("Refresh Tables")
         refresh_tables_btn.clicked.connect(self.refresh_tables)
         load_table_btn = QPushButton("Load Table")
@@ -184,12 +184,12 @@ class DatabaseViewerTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(28)
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(16)
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)

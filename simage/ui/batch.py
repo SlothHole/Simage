@@ -139,8 +139,8 @@ class BatchTab(QWidget):
         button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(24, 24, 24, 24)
-        layout.setSpacing(16)
+        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(28)
 
     def set_selected_images(self, image_paths: List[str]) -> None:
         self.selected_images = image_paths
