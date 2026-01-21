@@ -9,15 +9,24 @@ from PySide6.QtGui import QPixmap
 import os
 from collections import deque
 
+from .theme import (
+    DEFAULT_THUMB_SIZE,
+    DEFAULT_THUMB_SPACING,
+    MAX_THUMB_SIZE,
+    MAX_THUMB_SPACING,
+    MIN_THUMB_SIZE,
+    MIN_THUMB_SPACING,
+    theme_color,
+)
 
 
 class ThumbnailGrid(QWidget):
     image_selected = Signal(str, str)  # (image_path, thumb_path)
     images_selected = Signal(list)  # List of selected image paths
 
-    THUMB_SIZE = 128
-    COL_SPACING = 4
-    ROW_SPACING = 2
+    THUMB_SIZE = DEFAULT_THUMB_SIZE
+    COL_SPACING = DEFAULT_THUMB_SPACING
+    ROW_SPACING = DEFAULT_THUMB_SPACING
 
     def __init__(self, parent=None, folder=None):
         super().__init__(parent)
@@ -32,6 +41,8 @@ class ThumbnailGrid(QWidget):
         self._cols = 1
         self._row_count = 0
         self._col_count = 0
+        self.thumb_size = self.THUMB_SIZE
+        self.spacing = self.COL_SPACING
 
         self.scroll = QScrollArea(self)
         self.scroll.setWidgetResizable(True)
@@ -39,8 +50,8 @@ class ThumbnailGrid(QWidget):
         self.inner = QWidget()
         self.inner.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self.grid = QGridLayout(self.inner)
-        self.grid.setHorizontalSpacing(self.COL_SPACING)
-        self.grid.setVerticalSpacing(self.ROW_SPACING)
+        self.grid.setHorizontalSpacing(self.spacing)
+        self.grid.setVerticalSpacing(self.spacing)
         self.grid.setContentsMargins(0,0,0,0)
         self.grid.setAlignment(Qt.AlignTop | Qt.AlignLeft)
         self.inner.setLayout(self.grid)
@@ -73,13 +84,13 @@ class ThumbnailGrid(QWidget):
         if idx < 0:
             return
         row = idx // max(1, self._cols)
-        y = row * (self.THUMB_SIZE + self.ROW_SPACING)
+        y = row * (self.thumb_size + self.spacing)
         bar = self.scroll.verticalScrollBar()
         view_h = self.scroll.viewport().height()
         if y < bar.value():
             bar.setValue(y)
-        elif y + self.THUMB_SIZE > bar.value() + view_h:
-            bar.setValue(max(0, y - view_h + self.THUMB_SIZE))
+        elif y + self.thumb_size > bar.value() + view_h:
+            bar.setValue(max(0, y - view_h + self.thumb_size))
 
     def get_selected_images(self):
         out = []
@@ -97,10 +108,10 @@ class ThumbnailGrid(QWidget):
 
     def _compute_cols(self) -> int:
         width = self.scroll.viewport().width()
-        cell = self.THUMB_SIZE + self.COL_SPACING
+        cell = self.thumb_size + self.spacing
         if width <= 0:
             return 1
-        return max(1, (width + self.COL_SPACING) // cell)
+        return max(1, (width + self.spacing) // cell)
 
     def update_grid_geometry(self):
         for label in self.visible_labels.values():
@@ -122,16 +133,16 @@ class ThumbnailGrid(QWidget):
         self._col_count = self._cols
 
         for r in range(rows):
-            self.grid.setRowMinimumHeight(r, self.THUMB_SIZE)
+            self.grid.setRowMinimumHeight(r, self.thumb_size)
         for r in range(rows, prev_rows):
             self.grid.setRowMinimumHeight(r, 0)
         for c in range(self._cols):
-            self.grid.setColumnMinimumWidth(c, self.THUMB_SIZE)
+            self.grid.setColumnMinimumWidth(c, self.thumb_size)
         for c in range(self._cols, prev_cols):
             self.grid.setColumnMinimumWidth(c, 0)
 
         if rows > 0:
-            total_height = rows * self.THUMB_SIZE + (rows - 1) * self.ROW_SPACING
+            total_height = rows * self.thumb_size + (rows - 1) * self.spacing
         else:
             total_height = 0
         self.inner.setMinimumHeight(total_height)
@@ -143,7 +154,7 @@ class ThumbnailGrid(QWidget):
         pix = QPixmap(thumb_path)
         if pix.isNull():
             return QPixmap()
-        pix = pix.scaled(self.THUMB_SIZE, self.THUMB_SIZE, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        pix = pix.scaled(self.thumb_size, self.thumb_size, Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self._pixmap_cache[thumb_path] = pix
         self._pixmap_cache_order.append(thumb_path)
         if len(self._pixmap_cache_order) > self._pixmap_cache_max:
@@ -155,7 +166,7 @@ class ThumbnailGrid(QWidget):
         area = self.scroll.viewport().rect()
         y0 = self.scroll.verticalScrollBar().value()
         y1 = y0 + area.height()
-        thumb_h = self.THUMB_SIZE + self.ROW_SPACING
+        thumb_h = self.thumb_size + self.spacing
         first_row = max(0, y0 // thumb_h - 2)
         last_row = min((len(self.thumbs) + self._cols - 1) // self._cols, (y1 // thumb_h) + 2)
         # Remove labels not in visible range
@@ -173,21 +184,39 @@ class ThumbnailGrid(QWidget):
                 key = (row, col)
                 if key not in self.visible_labels:
                     thumb_path = self.thumbs[idx]
-                    img_path = self._image_path_for_index(idx)
                     label = QLabel()
-                    label.setFixedSize(self.THUMB_SIZE, self.THUMB_SIZE)
-                    label.setStyleSheet("background: #222; border: 1px solid #888;")
+                    label.setFixedSize(self.thumb_size, self.thumb_size)
                     label.setAlignment(Qt.AlignCenter)
                     if os.path.exists(thumb_path):
                         pix = self._get_pixmap(thumb_path)
                         label.setPixmap(pix)
                     else:
                         label.setText("?")
-                    if idx in self.selected_indices:
-                        label.setStyleSheet("background: #444; border: 2px solid #00f;")
                     label.mousePressEvent = self._make_select_handler(idx)
                     self.grid.addWidget(label, row, col)
                     self.visible_labels[key] = label
+                else:
+                    label = self.visible_labels[key]
+                label.setStyleSheet(self._thumb_style(selected=idx in self.selected_indices))
+
+    def refresh_theme(self):
+        for (row, col), label in self.visible_labels.items():
+            idx = row * self._cols + col
+            if idx >= len(self.thumbs):
+                continue
+            label.setStyleSheet(self._thumb_style(selected=idx in self.selected_indices))
+
+    def _thumb_style(self, *, selected: bool) -> str:
+        if selected:
+            bg = theme_color("selected_bg", "#d8e7ee")
+            border = theme_color("selected_border", "#2a6f8f")
+            border_width = 2
+        else:
+            bg = theme_color("bg", "#e8e1d8")
+            border = theme_color("border", "#b9b2a8")
+            border_width = 1
+        text = theme_color("text", "#4f4b46")
+        return f"background: {bg}; border: {border_width}px solid {border}; color: {text};"
 
     def eventFilter(self, obj, event):
         if event.type() == QEvent.Resize and obj in (self.inner, self.scroll.viewport()):
@@ -262,7 +291,7 @@ class ThumbnailGrid(QWidget):
             new_idx = len(self.thumbs) - 1
         elif event.key() in (Qt.Key_PageUp, Qt.Key_PageDown):
             view_h = self.scroll.viewport().height()
-            rows_per_page = max(1, view_h // (self.THUMB_SIZE + self.ROW_SPACING))
+            rows_per_page = max(1, view_h // (self.thumb_size + self.spacing))
             delta = rows_per_page * max(1, self._cols)
             if event.key() == Qt.Key_PageUp:
                 new_idx = max(0, idx - delta)
@@ -281,3 +310,23 @@ class ThumbnailGrid(QWidget):
 
     def sizeHint(self):
         return QSize(1024, 600)
+
+    def set_thumbnail_size(self, size: int) -> None:
+        size = max(MIN_THUMB_SIZE, min(MAX_THUMB_SIZE, int(size)))
+        if size == self.thumb_size:
+            return
+        self.thumb_size = size
+        self._pixmap_cache.clear()
+        self._pixmap_cache_order.clear()
+        self.update_grid_geometry()
+        self.update_visible_thumbnails()
+
+    def set_spacing(self, spacing: int) -> None:
+        spacing = max(MIN_THUMB_SPACING, min(MAX_THUMB_SPACING, int(spacing)))
+        if spacing == self.spacing:
+            return
+        self.spacing = spacing
+        self.grid.setHorizontalSpacing(self.spacing)
+        self.grid.setVerticalSpacing(self.spacing)
+        self.update_grid_geometry()
+        self.update_visible_thumbnails()

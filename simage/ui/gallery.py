@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QListWidget,
     QListWidgetItem,
+    QSlider,
     QToolButton,
     QWidgetAction,
 )
@@ -30,6 +31,18 @@ from simage.utils.paths import resolve_repo_path
 from .thumb_grid import ThumbnailGrid
 from .record_filter import load_records, filter_records, filter_by_tags
 from .thumbnails import THUMB_DIR, thumbnail_path_for_source
+from .theme import (
+    DEFAULT_THUMB_SIZE,
+    DEFAULT_THUMB_SPACING,
+    MAX_THUMB_SIZE,
+    MAX_THUMB_SPACING,
+    MIN_THUMB_SIZE,
+    MIN_THUMB_SPACING,
+    load_ui_settings,
+    load_splitter_sizes,
+    save_splitter_sizes,
+    save_ui_settings,
+)
 
 CSV_COLUMNS = [
     "id",
@@ -52,11 +65,13 @@ class GalleryTab(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         main_layout = QHBoxLayout(self)
+        self._apply_page_layout(main_layout)
         splitter = QSplitter(Qt.Horizontal)
 
         # Left: Search/filter/sort + Thumbnail grid + batch controls + export
         grid_widget = QWidget()
         grid_layout = QVBoxLayout(grid_widget)
+        self._apply_section_layout(grid_layout)
 
         search_layout = QHBoxLayout()
         self.search_input = QLineEdit()
@@ -124,6 +139,26 @@ class GalleryTab(QWidget):
         grid_header.addStretch(1)
         grid_layout.addLayout(grid_header)
 
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Thumbnail size"))
+        self.thumb_size_slider = QSlider(Qt.Horizontal)
+        self.thumb_size_slider.setRange(MIN_THUMB_SIZE, MAX_THUMB_SIZE)
+        self.thumb_size_value = QLabel("")
+        size_row.addWidget(self.thumb_size_slider)
+        size_row.addWidget(self.thumb_size_value)
+        size_row.addStretch(1)
+        grid_layout.addLayout(size_row)
+
+        spacing_row = QHBoxLayout()
+        spacing_row.addWidget(QLabel("Thumbnail spacing"))
+        self.thumb_spacing_slider = QSlider(Qt.Horizontal)
+        self.thumb_spacing_slider.setRange(MIN_THUMB_SPACING, MAX_THUMB_SPACING)
+        self.thumb_spacing_value = QLabel("")
+        spacing_row.addWidget(self.thumb_spacing_slider)
+        spacing_row.addWidget(self.thumb_spacing_value)
+        spacing_row.addStretch(1)
+        grid_layout.addLayout(spacing_row)
+
         self.grid = ThumbnailGrid()
         self.grid.image_selected.connect(self.on_image_selected)
         self.grid.images_selected.connect(self.on_images_selected)
@@ -134,10 +169,12 @@ class GalleryTab(QWidget):
         # Right: Side panel (image preview + info, resizable)
         side_panel = QWidget()
         side_layout = QVBoxLayout(side_panel)
+        self._apply_section_layout(side_layout)
         detail_splitter = QSplitter(Qt.Horizontal)
 
         preview_panel = QWidget()
         preview_layout = QVBoxLayout(preview_panel)
+        self._apply_section_layout(preview_layout)
         preview_header = QHBoxLayout()
         preview_header.addWidget(QLabel("Preview"))
         preview_header.addWidget(
@@ -159,6 +196,7 @@ class GalleryTab(QWidget):
 
         info_panel = QWidget()
         info_layout = QVBoxLayout(info_panel)
+        self._apply_section_layout(info_layout)
         info_header = QHBoxLayout()
         info_header.addWidget(QLabel("Metadata"))
         info_header.addWidget(
@@ -172,13 +210,13 @@ class GalleryTab(QWidget):
 
         detail_splitter.addWidget(preview_panel)
         detail_splitter.addWidget(info_panel)
-        detail_splitter.setSizes([600, 240])
+        self._init_splitter(detail_splitter, "gallery/details", [600, 240])
 
         side_layout.addWidget(detail_splitter)
         side_panel.setLayout(side_layout)
         splitter.addWidget(side_panel)
 
-        splitter.setSizes([900, 300])
+        self._init_splitter(splitter, "gallery/main", [900, 300])
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
@@ -190,8 +228,13 @@ class GalleryTab(QWidget):
         self.csv_columns = self._compute_csv_columns(self.all_records)
         self.thumb_cache = {}
         self.selected_tags = set()
+        self._ui_settings = load_ui_settings()
         self._build_tag_menu()
+        self._load_display_settings()
         self.update_grid()
+
+        self.thumb_size_slider.valueChanged.connect(self._on_thumb_size_changed)
+        self.thumb_spacing_slider.valueChanged.connect(self._on_thumb_spacing_changed)
 
     def _help_button(self, text):
         btn = QToolButton()
@@ -201,6 +244,27 @@ class GalleryTab(QWidget):
         btn.setCursor(Qt.WhatsThisCursor)
         btn.setFixedSize(16, 16)
         return btn
+
+    def _apply_page_layout(self, layout: QHBoxLayout) -> None:
+        layout.setContentsMargins(32, 32, 32, 32)
+        layout.setSpacing(20)
+
+    def _apply_section_layout(self, layout: QVBoxLayout) -> None:
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+    def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
+        sizes = load_splitter_sizes(key)
+        if sizes and len(sizes) == splitter.count():
+            splitter.setSizes(sizes)
+        else:
+            splitter.setSizes(fallback)
+        splitter.splitterMoved.connect(
+            lambda _pos, _idx, sp=splitter, k=key: self._save_splitter(sp, k)
+        )
+
+    def _save_splitter(self, splitter: QSplitter, key: str) -> None:
+        save_splitter_sizes(key, splitter.sizes())
 
     def _compute_csv_columns(self, records):
         extra = sorted({k for r in records for k in r.keys() if not k.startswith("_")} - set(CSV_COLUMNS))
@@ -355,3 +419,34 @@ class GalleryTab(QWidget):
         else:
             info = f"Image Path: {img_path}\nThumbnail Path: {thumb_path}"
             self.info_window.setPlainText(info)
+
+    def _load_display_settings(self) -> None:
+        self._ui_settings = load_ui_settings()
+        size = self._ui_settings.get("thumb_size", DEFAULT_THUMB_SIZE)
+        spacing = self._ui_settings.get("thumb_spacing", DEFAULT_THUMB_SPACING)
+        self.thumb_size_slider.blockSignals(True)
+        self.thumb_size_slider.setValue(size)
+        self.thumb_size_value.setText(str(size))
+        self.thumb_size_slider.blockSignals(False)
+        self.thumb_spacing_slider.blockSignals(True)
+        self.thumb_spacing_slider.setValue(spacing)
+        self.thumb_spacing_value.setText(str(spacing))
+        self.thumb_spacing_slider.blockSignals(False)
+        self.grid.set_thumbnail_size(size)
+        self.grid.set_spacing(spacing)
+
+    def _save_display_setting(self, key: str, value: int) -> None:
+        settings = load_ui_settings()
+        settings[key] = int(value)
+        save_ui_settings(settings)
+        self._ui_settings = settings
+
+    def _on_thumb_size_changed(self, value: int) -> None:
+        self.thumb_size_value.setText(str(value))
+        self.grid.set_thumbnail_size(value)
+        self._save_display_setting("thumb_size", value)
+
+    def _on_thumb_spacing_changed(self, value: int) -> None:
+        self.thumb_spacing_value.setText(str(value))
+        self.grid.set_spacing(value)
+        self._save_display_setting("thumb_spacing", value)

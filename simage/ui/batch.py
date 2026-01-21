@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -36,6 +37,7 @@ class BatchTab(QWidget):
 
         layout = QVBoxLayout(self)
         self.setLayout(layout)
+        self._apply_page_layout(layout)
 
         self.info_label = QLabel("Select images in the Gallery tab, then apply batch actions here.")
         self.info_label.setWordWrap(True)
@@ -63,6 +65,7 @@ class BatchTab(QWidget):
         self.batch_tag_input = QLineEdit()
         self.batch_tag_input.setPlaceholderText("Batch tag: tags, comma-separated")
         self.batch_tag_btn = QPushButton("Apply Batch Tags")
+        self._standard_button(self.batch_tag_btn)
         self.batch_tag_btn.clicked.connect(self.apply_batch_tags)
         tag_layout.addWidget(self.batch_tag_input)
         tag_layout.addWidget(self.batch_tag_btn)
@@ -75,6 +78,7 @@ class BatchTab(QWidget):
         self.batch_rename_input = QLineEdit()
         self.batch_rename_input.setPlaceholderText("Batch rename: base name")
         self.batch_rename_btn = QPushButton("Batch Rename")
+        self._standard_button(self.batch_rename_btn)
         self.batch_rename_btn.clicked.connect(self.apply_batch_rename)
         rename_layout.addWidget(self.batch_rename_input)
         rename_layout.addWidget(self.batch_rename_btn)
@@ -87,6 +91,7 @@ class BatchTab(QWidget):
         self.batch_move_input = QLineEdit()
         self.batch_move_input.setPlaceholderText("Batch move: target folder")
         self.batch_move_btn = QPushButton("Batch Move")
+        self._standard_button(self.batch_move_btn)
         self.batch_move_btn.clicked.connect(self.apply_batch_move)
         move_layout.addWidget(self.batch_move_input)
         move_layout.addWidget(self.batch_move_btn)
@@ -97,6 +102,7 @@ class BatchTab(QWidget):
 
         actions_layout = QHBoxLayout()
         self.export_btn = QPushButton("Export Selected")
+        self._standard_button(self.export_btn)
         self.export_btn.clicked.connect(self.export_selected)
         actions_layout.addWidget(self.export_btn)
         actions_layout.addWidget(
@@ -104,6 +110,7 @@ class BatchTab(QWidget):
         )
 
         self.import_btn = QPushButton("Import Folder")
+        self._standard_button(self.import_btn)
         self.import_btn.clicked.connect(self.import_folder)
         actions_layout.addWidget(self.import_btn)
         actions_layout.addWidget(
@@ -111,6 +118,7 @@ class BatchTab(QWidget):
         )
 
         self.refresh_btn = QPushButton("Refresh Pipeline")
+        self._standard_button(self.refresh_btn)
         self.refresh_btn.clicked.connect(self.refresh_pipeline)
         actions_layout.addWidget(self.refresh_btn)
         actions_layout.addWidget(
@@ -126,6 +134,13 @@ class BatchTab(QWidget):
         btn.setCursor(Qt.WhatsThisCursor)
         btn.setFixedSize(16, 16)
         return btn
+
+    def _standard_button(self, button: QPushButton) -> None:
+        button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
+
+    def _apply_page_layout(self, layout: QVBoxLayout) -> None:
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
 
     def set_selected_images(self, image_paths: List[str]) -> None:
         self.selected_images = image_paths

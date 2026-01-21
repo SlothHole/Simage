@@ -16,8 +16,10 @@ python -m simage.ui.app
 ## What Each Tab Does
 
 - Gallery & Search: thumbnail grid, metadata preview, tag filter dropdown, sort options, and keyboard navigation.
-- Tag Images: manage tags, rename tags, add tags to images, and maintain custom tags in `out/tag_list.json`.
+- Gallery controls: thumbnail size/spacing sliders and persistent splitters.
+- Tag Images: manage tags, rename tags, queue tag updates, and maintain custom tags in `out/tag_list.json`.
 - Batch Processing: import folders into `Input/`, batch tag/rename/move, export metadata JSON, and refresh the pipeline.
-- Settings: create `.venv`, install dependencies, run EXIF/ingest/resources/resolve/all, and restart the UI.
+- Edit Images: workflow search/anchor tools, editable prompt/model params, image details, and metadata strip actions.
+- Settings: display themes/custom colors/font (saved in `out/ui_settings.json`), environment setup, pipeline actions, and restart the UI.
 - DB Viewer: connect/browse DB, list tables, run SQL with history, export CSV, and copy rows/cells.
-- Edit Images / Full Image Viewer: placeholders for future tools.
+- Full Image Viewer: placeholder for future tools.

@@ -25,6 +25,7 @@ from PySide6.QtWidgets import (
 )
 
 from simage.utils.paths import resolve_repo_path
+from .theme import load_splitter_sizes, save_splitter_sizes
 
 
 class DatabaseViewerTab(QWidget):
@@ -34,6 +35,7 @@ class DatabaseViewerTab(QWidget):
         self._last_headers = []
 
         layout = QVBoxLayout(self)
+        self._apply_page_layout(layout)
 
         # Connection row
         conn_row = QHBoxLayout()
@@ -91,6 +93,7 @@ class DatabaseViewerTab(QWidget):
         self.sql_input.setPlaceholderText("Write SQL here. Example: SELECT * FROM images LIMIT 50;")
         sql_panel = QWidget()
         sql_layout = QVBoxLayout(sql_panel)
+        self._apply_section_layout(sql_layout)
         sql_header = QHBoxLayout()
         sql_header.addWidget(QLabel("SQL Editor"))
         sql_header.addWidget(
@@ -103,6 +106,7 @@ class DatabaseViewerTab(QWidget):
 
         history_panel = QWidget()
         history_layout = QVBoxLayout(history_panel)
+        self._apply_section_layout(history_layout)
         history_header = QHBoxLayout()
         history_header.addWidget(QLabel("History"))
         history_header.addWidget(
@@ -114,7 +118,7 @@ class DatabaseViewerTab(QWidget):
         self.history_list.itemDoubleClicked.connect(self.load_history_item)
         history_layout.addWidget(self.history_list)
         editor_split.addWidget(history_panel)
-        editor_split.setSizes([700, 240])
+        self._init_splitter(editor_split, "db/editor", [700, 240])
 
         run_row = QHBoxLayout()
         self.limit_spin = QSpinBox()
@@ -157,6 +161,7 @@ class DatabaseViewerTab(QWidget):
         vertical_split.addWidget(editor_split)
         results_panel = QWidget()
         results_layout = QVBoxLayout(results_panel)
+        self._apply_section_layout(results_layout)
         results_header = QHBoxLayout()
         results_header.addWidget(QLabel("Results"))
         results_header.addWidget(
@@ -166,7 +171,7 @@ class DatabaseViewerTab(QWidget):
         results_layout.addLayout(results_header)
         results_layout.addWidget(self.table)
         vertical_split.addWidget(results_panel)
-        vertical_split.setSizes([240, 520])
+        self._init_splitter(vertical_split, "db/vertical", [240, 520])
         layout.addWidget(vertical_split)
 
     def _help_button(self, text: str) -> QToolButton:
@@ -177,6 +182,27 @@ class DatabaseViewerTab(QWidget):
         btn.setCursor(Qt.WhatsThisCursor)
         btn.setFixedSize(16, 16)
         return btn
+
+    def _apply_page_layout(self, layout: QVBoxLayout) -> None:
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+    def _apply_section_layout(self, layout: QVBoxLayout) -> None:
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+    def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
+        sizes = load_splitter_sizes(key)
+        if sizes and len(sizes) == splitter.count():
+            splitter.setSizes(sizes)
+        else:
+            splitter.setSizes(fallback)
+        splitter.splitterMoved.connect(
+            lambda _pos, _idx, sp=splitter, k=key: self._save_splitter(sp, k)
+        )
+
+    def _save_splitter(self, splitter: QSplitter, key: str) -> None:
+        save_splitter_sizes(key, splitter.sizes())
 
     def _resolve_db_path(self, path_str: str) -> str:
         raw = Path(path_str)

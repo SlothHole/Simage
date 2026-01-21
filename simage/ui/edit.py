@@ -1,7 +1,9 @@
+import html
 import json
 import os
 import re
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -13,11 +15,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QHBoxLayout,
     QAbstractItemView,
+    QGridLayout,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QTabWidget,
     QTextEdit,
     QToolButton,
     QVBoxLayout,
@@ -26,6 +30,8 @@ from PySide6.QtWidgets import (
 )
 
 from simage.utils.paths import resolve_repo_path
+from .theme import theme_color
+from .theme import load_splitter_sizes, save_splitter_sizes
 
 
 class EditTab(QWidget):
@@ -35,6 +41,7 @@ class EditTab(QWidget):
         self.selected_images: List[str] = []
         self.workflow_text_by_name: Dict[str, str] = {}
         self.workflow_obj_by_name: Dict[str, object] = {}
+        self.record_by_name: Dict[str, Dict[str, object]] = {}
         self.last_find_text = ""
         self.last_find_match_case = False
         self.last_find_relax_values = True
@@ -44,8 +51,10 @@ class EditTab(QWidget):
         self.active_workflow_name: Optional[str] = None
         self.current_nodes_by_id: Dict[int, Dict[str, object]] = {}
         self.current_widget_idx_map: Dict[str, Dict[str, int]] = {}
+        self._edit_settings_snapshot: Dict[str, object] = {}
 
         layout = QVBoxLayout(self)
+        self._apply_page_layout(layout)
 
         info_label = QLabel("Workflow tools: find and extract values across selected images.")
         info_label.setWordWrap(True)
@@ -110,6 +119,7 @@ class EditTab(QWidget):
 
         selected_panel = QWidget()
         selected_layout = QVBoxLayout(selected_panel)
+        self._apply_section_layout(selected_layout)
         selected_header = QHBoxLayout()
         selected_header.addWidget(QLabel("Selected Images"))
         self.selected_label = QLabel("Selected: 0")
@@ -124,6 +134,7 @@ class EditTab(QWidget):
 
         matches_panel = QWidget()
         matches_layout = QVBoxLayout(matches_panel)
+        self._apply_section_layout(matches_layout)
         matches_header = QHBoxLayout()
         matches_header.addWidget(QLabel("Find Text"))
         matches_header.addWidget(
@@ -151,6 +162,7 @@ class EditTab(QWidget):
 
         anchor_panel = QWidget()
         anchor_layout = QVBoxLayout(anchor_panel)
+        self._apply_section_layout(anchor_layout)
         anchor_header = QHBoxLayout()
         anchor_header.addWidget(QLabel("Anchor by Node"))
         anchor_header.addWidget(
@@ -185,10 +197,11 @@ class EditTab(QWidget):
         left_splitter.addWidget(selected_panel)
         left_splitter.addWidget(anchor_panel)
         left_splitter.addWidget(matches_panel)
-        left_splitter.setSizes([220, 360, 240])
+        self._init_splitter(left_splitter, "edit/left", [220, 360, 240])
 
         workflow_panel = QWidget()
         workflow_layout = QVBoxLayout(workflow_panel)
+        self._apply_section_layout(workflow_layout)
         workflow_header = QHBoxLayout()
         workflow_header.addWidget(QLabel("Workflow"))
         workflow_header.addWidget(
@@ -202,11 +215,11 @@ class EditTab(QWidget):
         main_splitter.addWidget(workflow_panel)
         main_splitter.setStretchFactor(0, 1)
         main_splitter.setStretchFactor(1, 3)
-        main_splitter.setSizes([360, 840])
-        layout.addWidget(main_splitter)
+        self._init_splitter(main_splitter, "edit/main", [360, 840])
 
         file_actions_panel = QWidget()
         file_actions_layout = QVBoxLayout(file_actions_panel)
+        self._apply_section_layout(file_actions_layout)
         file_header = QHBoxLayout()
         file_header.addWidget(QLabel("File Actions"))
         file_header.addWidget(
@@ -234,8 +247,141 @@ class EditTab(QWidget):
         )
         actions_row.addStretch(1)
         file_actions_layout.addLayout(actions_row)
-        layout.addWidget(file_actions_panel)
-        layout.addStretch(1)
+
+        self.edit_prompt = QTextEdit()
+        self.edit_negative_prompt = QTextEdit()
+        self.edit_model = QLineEdit()
+        self.edit_sampler = QLineEdit()
+        self.edit_scheduler = QLineEdit()
+        self.edit_steps = QLineEdit()
+        self.edit_cfg_scale = QLineEdit()
+        self.edit_seed = QLineEdit()
+        self._edit_fields = [
+            self.edit_prompt,
+            self.edit_negative_prompt,
+            self.edit_model,
+            self.edit_sampler,
+            self.edit_scheduler,
+            self.edit_steps,
+            self.edit_cfg_scale,
+            self.edit_seed,
+        ]
+
+        edit_settings_panel = QWidget()
+        edit_settings_layout = QVBoxLayout(edit_settings_panel)
+        self._apply_section_layout(edit_settings_layout)
+        edit_header = QHBoxLayout()
+        edit_header.addWidget(QLabel("Edit Settings"))
+        edit_header.addWidget(
+            self._help_button("Update key metadata fields in records.jsonl.")
+        )
+        edit_header.addStretch(1)
+        edit_settings_layout.addLayout(edit_header)
+        self.edit_active_label = QLabel("Editing: none")
+        edit_settings_layout.addWidget(self.edit_active_label)
+
+        edit_settings_layout.addWidget(QLabel("Prompt"))
+        edit_settings_layout.addWidget(self.edit_prompt)
+        edit_settings_layout.addWidget(QLabel("Negative Prompt"))
+        edit_settings_layout.addWidget(self.edit_negative_prompt)
+
+        fields_grid = QGridLayout()
+        fields_grid.addWidget(QLabel("Model"), 0, 0)
+        fields_grid.addWidget(self.edit_model, 0, 1)
+        fields_grid.addWidget(QLabel("Sampler"), 1, 0)
+        fields_grid.addWidget(self.edit_sampler, 1, 1)
+        fields_grid.addWidget(QLabel("Scheduler"), 2, 0)
+        fields_grid.addWidget(self.edit_scheduler, 2, 1)
+        fields_grid.addWidget(QLabel("Steps"), 0, 2)
+        fields_grid.addWidget(self.edit_steps, 0, 3)
+        fields_grid.addWidget(QLabel("CFG Scale"), 1, 2)
+        fields_grid.addWidget(self.edit_cfg_scale, 1, 3)
+        fields_grid.addWidget(QLabel("Seed"), 2, 2)
+        fields_grid.addWidget(self.edit_seed, 2, 3)
+        edit_settings_layout.addLayout(fields_grid)
+
+        edit_actions = QHBoxLayout()
+        self.save_settings_btn = QPushButton("Save to current image")
+        self.save_settings_btn.clicked.connect(self.save_current_settings)
+        self.save_all_settings_btn = QPushButton("Apply to all selected images")
+        self.save_all_settings_btn.clicked.connect(self.save_all_settings)
+        self.reset_settings_btn = QPushButton("Reload current image")
+        self.reset_settings_btn.clicked.connect(self.reload_edit_fields)
+        edit_actions.addWidget(self.save_settings_btn)
+        edit_actions.addWidget(self.save_all_settings_btn)
+        edit_actions.addWidget(self.reset_settings_btn)
+        edit_actions.addStretch(1)
+        edit_settings_layout.addLayout(edit_actions)
+        edit_settings_layout.addStretch(1)
+
+        details_panel = QWidget()
+        details_layout = QVBoxLayout(details_panel)
+        self._apply_section_layout(details_layout)
+        details_header = QHBoxLayout()
+        details_header.addWidget(QLabel("Image Details"))
+        details_header.addWidget(
+            self._help_button("Metadata loaded from records.jsonl and workflow JSON.")
+        )
+        details_header.addStretch(1)
+        details_layout.addLayout(details_header)
+        self.details_name_label = QLabel("Image: none")
+        details_layout.addWidget(self.details_name_label)
+        ip_row = QHBoxLayout()
+        ip_row.addWidget(QLabel("IP Address"))
+        self.ip_value_label = QLabel("Not found")
+        ip_row.addWidget(self.ip_value_label)
+        ip_row.addStretch(1)
+        details_layout.addLayout(ip_row)
+
+        details_splitter = QSplitter(Qt.Vertical)
+        summary_panel = QWidget()
+        summary_layout = QVBoxLayout(summary_panel)
+        self._apply_section_layout(summary_layout)
+        summary_layout.addWidget(QLabel("Summary"))
+        self.summary_view = QTextEdit()
+        self.summary_view.setReadOnly(True)
+        summary_layout.addWidget(self.summary_view)
+        details_splitter.addWidget(summary_panel)
+
+        kv_panel = QWidget()
+        kv_layout = QVBoxLayout(kv_panel)
+        self._apply_section_layout(kv_layout)
+        kv_layout.addWidget(QLabel("Key/Value Metadata"))
+        self.kv_view = QTextEdit()
+        self.kv_view.setReadOnly(True)
+        kv_layout.addWidget(self.kv_view)
+        details_splitter.addWidget(kv_panel)
+
+        raw_panel = QWidget()
+        raw_layout = QVBoxLayout(raw_panel)
+        self._apply_section_layout(raw_layout)
+        raw_layout.addWidget(QLabel("Raw Text Preview"))
+        self.raw_view = QTextEdit()
+        self.raw_view.setReadOnly(True)
+        raw_layout.addWidget(self.raw_view)
+        details_splitter.addWidget(raw_panel)
+        self._init_splitter(details_splitter, "edit/details", [220, 220, 180])
+
+        details_layout.addWidget(details_splitter)
+
+        workflow_tab = QWidget()
+        workflow_layout = QVBoxLayout(workflow_tab)
+        workflow_layout.addWidget(main_splitter)
+        workflow_layout.addStretch(1)
+
+        file_actions_tab = QWidget()
+        file_actions_tab_layout = QVBoxLayout(file_actions_tab)
+        file_actions_tab_layout.addWidget(file_actions_panel)
+        file_actions_tab_layout.addStretch(1)
+
+        self.tabs = QTabWidget()
+        self.tabs.addTab(workflow_tab, "Workflow Tools")
+        self.tabs.addTab(edit_settings_panel, "Edit Settings")
+        self.tabs.addTab(details_panel, "Image Details")
+        self.tabs.addTab(file_actions_tab, "File Actions")
+        layout.addWidget(self.tabs)
+        self._clear_details()
+        self._clear_edit_fields()
 
     def _help_button(self, text):
         btn = QToolButton()
@@ -245,6 +391,27 @@ class EditTab(QWidget):
         btn.setCursor(Qt.WhatsThisCursor)
         btn.setFixedSize(16, 16)
         return btn
+
+    def _apply_page_layout(self, layout: QVBoxLayout) -> None:
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+
+    def _apply_section_layout(self, layout: QVBoxLayout) -> None:
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+    def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
+        sizes = load_splitter_sizes(key)
+        if sizes and len(sizes) == splitter.count():
+            splitter.setSizes(sizes)
+        else:
+            splitter.setSizes(fallback)
+        splitter.splitterMoved.connect(
+            lambda _pos, _idx, sp=splitter, k=key: self._save_splitter(sp, k)
+        )
+
+    def _save_splitter(self, splitter: QSplitter, key: str) -> None:
+        save_splitter_sizes(key, splitter.sizes())
 
     def set_selected_images(self, image_paths: List[str]) -> None:
         self.selected_images = image_paths
@@ -270,6 +437,9 @@ class EditTab(QWidget):
         else:
             self._set_workflow_text("No image selected.")
             self._clear_highlights()
+            self.active_workflow_name = None
+            self._clear_details()
+            self._clear_edit_fields()
 
     def _ensure_selection(self) -> bool:
         if self.selected_images:
@@ -296,6 +466,7 @@ class EditTab(QWidget):
 
     def _load_workflows_for_names(self, names: List[str]) -> Dict[str, str]:
         self.workflow_obj_by_name = {}
+        self.record_by_name = {}
         if not names or not os.path.exists(self.records_jsonl_path):
             return {}
         target = set(names)
@@ -317,6 +488,7 @@ class EditTab(QWidget):
                     wf = rec.get("kv", {}).get("workflow_json")
                 self.workflow_obj_by_name[name] = self._normalize_workflow_obj(wf)
                 out[name] = self._format_workflow(wf)
+                self.record_by_name[name] = rec
                 target.discard(name)
                 if not target:
                     break
@@ -372,6 +544,8 @@ class EditTab(QWidget):
                 self._set_workflow_text("No workflow JSON found for this image.")
             self._clear_highlights()
             self._refresh_node_list()
+            self._refresh_details_for_name(name)
+            self._refresh_edit_fields_for_name(name)
             return
         self._set_workflow_text(text)
         if highlight_span:
@@ -380,6 +554,8 @@ class EditTab(QWidget):
             self._highlight_matches(self.last_find_text, self.last_find_match_case, self.last_find_relax_values)
             self._focus_first_match(self.last_find_text, self.last_find_match_case)
         self._refresh_node_list()
+        self._refresh_details_for_name(name)
+        self._refresh_edit_fields_for_name(name)
 
     def _on_selected_item_changed(self) -> None:
         items = self.selected_list.selectedItems()
@@ -551,6 +727,414 @@ class EditTab(QWidget):
             return s if len(s) <= 80 else f"{s[:77]}..."
         return str(value)
 
+    def _clear_details(self) -> None:
+        self.details_name_label.setText("Image: none")
+        self.ip_value_label.setText("Not found")
+        self.summary_view.setPlainText("No details loaded.")
+        self.kv_view.setPlainText("")
+        self.raw_view.setPlainText("")
+
+    def _refresh_details_for_name(self, name: str) -> None:
+        rec = self.record_by_name.get(name)
+        if not rec:
+            self._clear_details()
+            return
+        self.details_name_label.setText(f"Image: {name}")
+        ip, source = self._extract_ip(rec)
+        if ip:
+            self.ip_value_label.setText(f"{ip} ({source})")
+        else:
+            self.ip_value_label.setText("Not found")
+
+        self.summary_view.setHtml(self._build_summary(rec, name))
+        kv = rec.get("kv")
+        if isinstance(kv, dict) and kv:
+            self.kv_view.setPlainText(json.dumps(kv, indent=2, ensure_ascii=False))
+        else:
+            self.kv_view.setPlainText("No key/value metadata found.")
+
+        raw = rec.get("raw_text_preview")
+        if isinstance(raw, str) and raw.strip():
+            self.raw_view.setPlainText(raw)
+        else:
+            self.raw_view.setPlainText("No raw text preview.")
+
+    def _build_summary(self, rec: Dict[str, object], name: str) -> str:
+        lines = []
+
+        def add(label: str, value: object) -> None:
+            if value in (None, ""):
+                return
+            lines.append(
+                f"<div><span style='font-weight:700;'>{html.escape(label)}:</span> "
+                f"{html.escape(str(value))}</div>"
+            )
+
+        dims = None
+        width = rec.get("width")
+        height = rec.get("height")
+        if width or height:
+            dims = f"{width} x {height}"
+
+        add("File", rec.get("file_name") or name)
+        add("Source", rec.get("source_file"))
+        add("Format", rec.get("format_hint"))
+        add("Dimensions", dims)
+        add("Created UTC", rec.get("created_utc"))
+        add("Imported UTC", rec.get("imported_utc"))
+        add("SHA256", rec.get("sha256"))
+        add("Model", rec.get("model"))
+        add("Sampler", rec.get("sampler"))
+        add("Scheduler", rec.get("scheduler"))
+        add("Steps", rec.get("steps"))
+        add("CFG Scale", rec.get("cfg_scale"))
+        add("Seed", rec.get("seed"))
+
+        kv = rec.get("kv") if isinstance(rec.get("kv"), dict) else {}
+        prompt = rec.get("prompt") or kv.get("prompt_text") or kv.get("prompt")
+        neg = rec.get("negative_prompt") or kv.get("neg_prompt_text") or kv.get("negative_prompt")
+        add("Prompt", self._truncate_text(prompt))
+        add("Negative Prompt", self._truncate_text(neg))
+
+        resources = rec.get("resources")
+        if isinstance(resources, list) and resources:
+            resource_lines = []
+            for res in resources:
+                if not isinstance(res, dict):
+                    continue
+                kind = res.get("kind") or "resource"
+                name_val = res.get("name") or "unknown"
+                resource_lines.append(f"{kind}: {name_val}")
+            if resource_lines:
+                add("Resources", "; ".join(resource_lines))
+
+        wf = self.workflow_obj_by_name.get(name)
+        nodes = self._workflow_nodes(wf) if wf else []
+        if nodes:
+            bypassed = sum(1 for n in nodes if self._node_is_bypassed(n))
+            add("Workflow nodes", len(nodes))
+            add("Bypassed nodes", bypassed)
+
+        if not lines:
+            return "<div>No details loaded.</div>"
+        return "<div style='line-height:1.35;'>" + "".join(lines) + "</div>"
+
+    def _truncate_text(self, value: object, max_len: int = 180) -> str:
+        if value in (None, ""):
+            return ""
+        text = str(value).replace("\n", " ").strip()
+        if len(text) <= max_len:
+            return text
+        return text[: max_len - 3] + "..."
+
+    def _extract_ip(self, rec: Dict[str, object]) -> tuple[str, str]:
+        key_candidates = (
+            "ip",
+            "ip_address",
+            "ip_addr",
+            "client_ip",
+            "remote_ip",
+            "source_ip",
+            "ipv4",
+        )
+        for key in key_candidates:
+            val = rec.get(key)
+            if isinstance(val, str):
+                ip = self._find_ip_in_text(val)
+                if ip:
+                    return ip, f"record.{key}"
+
+        kv = rec.get("kv")
+        if isinstance(kv, dict):
+            for k, v in kv.items():
+                if "ip" in str(k).lower():
+                    ip = self._find_ip_in_text(str(v))
+                    if ip:
+                        return ip, f"kv.{k}"
+            for v in kv.values():
+                if isinstance(v, str):
+                    ip = self._find_ip_in_text(v)
+                    if ip:
+                        return ip, "kv"
+
+        raw = rec.get("raw_text_preview")
+        if isinstance(raw, str):
+            ip = self._find_ip_in_text(raw)
+            if ip:
+                return ip, "raw_text_preview"
+
+        wf = rec.get("workflow_json")
+        if wf is not None:
+            if isinstance(wf, str):
+                text = wf
+            else:
+                try:
+                    text = json.dumps(wf, ensure_ascii=False)
+                except Exception:
+                    text = str(wf)
+            ip = self._find_ip_in_text(text)
+            if ip:
+                return ip, "workflow_json"
+
+        return "", ""
+
+    def _find_ip_in_text(self, text: str) -> str:
+        if not text:
+            return ""
+        matches = re.findall(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", text)
+        for match in matches:
+            if self._valid_ip(match):
+                return match
+        return ""
+
+    def _valid_ip(self, ip: str) -> bool:
+        parts = ip.split(".")
+        if len(parts) != 4:
+            return False
+        try:
+            return all(0 <= int(p) <= 255 for p in parts)
+        except Exception:
+            return False
+
+    def _clear_edit_fields(self) -> None:
+        self._edit_settings_snapshot = {}
+        self.edit_active_label.setText("Editing: none")
+        self.edit_prompt.setPlainText("")
+        self.edit_negative_prompt.setPlainText("")
+        self.edit_model.clear()
+        self.edit_sampler.clear()
+        self.edit_scheduler.clear()
+        self.edit_steps.clear()
+        self.edit_cfg_scale.clear()
+        self.edit_seed.clear()
+        self._set_edit_enabled(False)
+
+    def _set_edit_enabled(self, enabled: bool) -> None:
+        for widget in self._edit_fields:
+            widget.setEnabled(enabled)
+        self.save_settings_btn.setEnabled(enabled)
+        self.save_all_settings_btn.setEnabled(enabled)
+        self.reset_settings_btn.setEnabled(enabled)
+
+    def _refresh_edit_fields_for_name(self, name: str) -> None:
+        rec = self.record_by_name.get(name)
+        if not rec:
+            self._clear_edit_fields()
+            return
+        self._set_edit_enabled(True)
+        self.edit_active_label.setText(f"Editing: {name}")
+        kv = rec.get("kv") if isinstance(rec.get("kv"), dict) else {}
+
+        prompt = rec.get("prompt") or kv.get("prompt_text") or kv.get("prompt")
+        neg = rec.get("negative_prompt") or kv.get("neg_prompt_text") or kv.get("negative_prompt")
+        model = rec.get("model")
+        sampler = rec.get("sampler")
+        scheduler = rec.get("scheduler")
+        steps = self._coerce_int(rec.get("steps"))
+        cfg_scale = self._coerce_float(rec.get("cfg_scale"))
+        seed = self._coerce_int(rec.get("seed"))
+
+        self.edit_prompt.setPlainText("" if prompt is None else str(prompt))
+        self.edit_negative_prompt.setPlainText("" if neg is None else str(neg))
+        self.edit_model.setText("" if model is None else str(model))
+        self.edit_sampler.setText("" if sampler is None else str(sampler))
+        self.edit_scheduler.setText("" if scheduler is None else str(scheduler))
+        self.edit_steps.setText("" if steps is None else str(steps))
+        self.edit_cfg_scale.setText("" if cfg_scale is None else str(cfg_scale))
+        self.edit_seed.setText("" if seed is None else str(seed))
+
+        self._edit_settings_snapshot = {
+            "prompt": prompt,
+            "negative_prompt": neg,
+            "model": model,
+            "sampler": sampler,
+            "scheduler": scheduler,
+            "steps": steps,
+            "cfg_scale": cfg_scale,
+            "seed": seed,
+        }
+
+    def reload_edit_fields(self) -> None:
+        name = self.active_workflow_name
+        if not name:
+            self._clear_edit_fields()
+            return
+        self._refresh_edit_fields_for_name(name)
+
+    def save_current_settings(self) -> None:
+        self._save_settings(for_all=False)
+
+    def save_all_settings(self) -> None:
+        self._save_settings(for_all=True)
+
+    def _save_settings(self, *, for_all: bool) -> None:
+        if not self._ensure_selection():
+            return
+        if not self.active_workflow_name:
+            QMessageBox.information(self, "Edit Settings", "Select an image first.")
+            return
+        changes = self._collect_edit_changes()
+        if changes is None:
+            return
+        if not changes:
+            QMessageBox.information(self, "Edit Settings", "No changes to save.")
+            return
+
+        targets = self._selected_names() if for_all else [self.active_workflow_name]
+        updated = self._update_records_jsonl(targets, changes)
+        if updated == 0:
+            QMessageBox.information(self, "Edit Settings", "No records were updated.")
+            return
+
+        for name in targets:
+            rec = self.record_by_name.get(name)
+            if rec:
+                self._apply_changes_to_record(rec, changes)
+
+        self._refresh_details_for_name(self.active_workflow_name)
+        self._refresh_edit_fields_for_name(self.active_workflow_name)
+        QMessageBox.information(self, "Edit Settings", f"Updated {updated} record(s) in records.jsonl.")
+
+    def _collect_edit_changes(self) -> Optional[Dict[str, object]]:
+        errors = []
+
+        prompt = self.edit_prompt.toPlainText().strip()
+        neg = self.edit_negative_prompt.toPlainText().strip()
+        model = self.edit_model.text().strip()
+        sampler = self.edit_sampler.text().strip()
+        scheduler = self.edit_scheduler.text().strip()
+
+        steps, err = self._parse_int_field(self.edit_steps.text().strip(), "Steps")
+        if err:
+            errors.append(err)
+        cfg_scale, err = self._parse_float_field(self.edit_cfg_scale.text().strip(), "CFG Scale")
+        if err:
+            errors.append(err)
+        seed, err = self._parse_int_field(self.edit_seed.text().strip(), "Seed")
+        if err:
+            errors.append(err)
+
+        if errors:
+            QMessageBox.warning(self, "Edit Settings", "\n".join(errors))
+            return None
+
+        new_values = {
+            "prompt": prompt or None,
+            "negative_prompt": neg or None,
+            "model": model or None,
+            "sampler": sampler or None,
+            "scheduler": scheduler or None,
+            "steps": steps,
+            "cfg_scale": cfg_scale,
+            "seed": seed,
+        }
+
+        changes = {}
+        for key, new_value in new_values.items():
+            if new_value != self._edit_settings_snapshot.get(key):
+                changes[key] = new_value
+        return changes
+
+    def _parse_int_field(self, value: str, label: str) -> tuple[Optional[int], str | None]:
+        if value == "":
+            return None, None
+        try:
+            return int(value), None
+        except Exception:
+            return None, f"{label} must be an integer."
+
+    def _parse_float_field(self, value: str, label: str) -> tuple[Optional[float], str | None]:
+        if value == "":
+            return None, None
+        try:
+            return float(value), None
+        except Exception:
+            return None, f"{label} must be a number."
+
+    def _coerce_int(self, value: object) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, int):
+            return value
+        try:
+            return int(str(value))
+        except Exception:
+            return None
+
+    def _coerce_float(self, value: object) -> Optional[float]:
+        if value is None:
+            return None
+        if isinstance(value, float):
+            return value
+        if isinstance(value, int):
+            return float(value)
+        try:
+            return float(str(value))
+        except Exception:
+            return None
+
+    def _update_records_jsonl(self, names: List[str], changes: Dict[str, object]) -> int:
+        if not os.path.exists(self.records_jsonl_path):
+            QMessageBox.warning(
+                self,
+                "Edit Settings",
+                "records.jsonl not found. Run the pipeline to generate workflows.",
+            )
+            return 0
+
+        names_set = set(names)
+        updated = 0
+        output_lines: List[str] = []
+        with open(self.records_jsonl_path, "r", encoding="utf-8") as f:
+            for line in f:
+                raw = line.rstrip("\n")
+                if not raw.strip():
+                    continue
+                try:
+                    rec = json.loads(raw)
+                except Exception:
+                    output_lines.append(raw)
+                    continue
+                if rec.get("file_name") in names_set:
+                    self._apply_changes_to_record(rec, changes)
+                    updated += 1
+                output_lines.append(json.dumps(rec, ensure_ascii=False))
+
+        if updated == 0:
+            return 0
+
+        backup_path = self.records_jsonl_path + ".bak"
+        try:
+            shutil.copy2(self.records_jsonl_path, backup_path)
+        except Exception:
+            pass
+
+        with open(self.records_jsonl_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(output_lines) + "\n")
+        return updated
+
+    def _apply_changes_to_record(self, rec: Dict[str, object], changes: Dict[str, object]) -> None:
+        for key, value in changes.items():
+            rec[key] = value
+
+        kv = rec.get("kv")
+        if not isinstance(kv, dict):
+            return
+
+        if "prompt" in changes:
+            if "prompt" in kv:
+                kv["prompt"] = changes["prompt"]
+            if "prompt_text" in kv:
+                kv["prompt_text"] = changes["prompt"]
+        if "negative_prompt" in changes:
+            if "negative_prompt" in kv:
+                kv["negative_prompt"] = changes["negative_prompt"]
+            if "neg_prompt_text" in kv:
+                kv["neg_prompt_text"] = changes["negative_prompt"]
+        for key in ("model", "sampler", "scheduler", "steps", "cfg_scale", "seed"):
+            if key in changes and key in kv:
+                kv[key] = changes[key]
+
     def _on_workflow_selection_changed(self) -> None:
         if self._suspend_auto_find or not self.auto_find_check.isChecked():
             return
@@ -643,7 +1227,7 @@ class EditTab(QWidget):
         sel = QTextEdit.ExtraSelection()
         sel.cursor = cursor
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#ffe08a"))
+        fmt.setBackground(QColor(theme_color("highlight", "#ffe08a")))
         sel.format = fmt
         self.workflow_view.setExtraSelections([sel])
         self.workflow_view.setTextCursor(cursor)
@@ -657,7 +1241,7 @@ class EditTab(QWidget):
         cursor = QTextCursor(doc)
         flags = QTextDocument.FindCaseSensitively if match_case else QTextDocument.FindFlags()
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#ffe08a"))
+        fmt.setBackground(QColor(theme_color("highlight", "#ffe08a")))
         while True:
             cursor = doc.find(text, cursor, flags)
             if cursor.isNull():

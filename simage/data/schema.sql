@@ -1,5 +1,11 @@
 PRAGMA journal_mode=WAL;
 PRAGMA synchronous=NORMAL;
+PRAGMA foreign_keys = ON;
+PRAGMA temp_store = MEMORY;
+PRAGMA wal_autocheckpoint = 1000; -- pages; tune later
+PRAGMA optimize;
+PRAGMA busy_timeout = 5000;
+
 
 CREATE TABLE IF NOT EXISTS images (
   id TEXT PRIMARY KEY,
@@ -50,3 +56,44 @@ CREATE TABLE IF NOT EXISTS files (
   extra_json TEXT,
   FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS image_gen (
+  image_id TEXT PRIMARY KEY,
+
+  model_name TEXT,
+  model_version TEXT,
+  model_hash TEXT,
+  base_model TEXT,
+
+  sampler TEXT,
+  scheduler TEXT,
+  steps INTEGER,
+  cfg REAL,
+  seed INTEGER,
+
+  prompt_pos_raw TEXT,
+  prompt_neg_raw TEXT,
+  prompt_pos_norm TEXT,
+  prompt_neg_norm TEXT,
+
+  created_utc TEXT,
+
+  FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS prompt_tags (
+  image_id TEXT NOT NULL,
+  side TEXT NOT NULL,         -- 'pos' or 'neg'
+  tag TEXT NOT NULL,          -- normalized (weight removed)
+  weight REAL,                -- numeric weight if present else NULL
+  pos INTEGER,                -- original order index
+  raw TEXT,                   -- original token
+
+  PRIMARY KEY (image_id, side, tag),
+  FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE,
+  CHECK (side IN ('pos','neg'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_prompt_tags_side ON prompt_tags(side);
+CREATE INDEX IF NOT EXISTS idx_prompt_tags_tag  ON prompt_tags(tag);
+CREATE INDEX IF NOT EXISTS idx_prompt_tags_img  ON prompt_tags(image_id);

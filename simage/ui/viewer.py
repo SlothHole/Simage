@@ -6,6 +6,8 @@ class ViewerTab(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
         label = QLabel("Info: Viewer tools are not available yet. More functions will be added later.")
         label.setAlignment(Qt.AlignCenter)
         label.setWordWrap(True)
