@@ -246,7 +246,7 @@ class GalleryTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QHBoxLayout) -> None:
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(28)
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:

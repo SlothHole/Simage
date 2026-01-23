@@ -334,7 +334,7 @@ QTabWidget::pane {{
     background-color: {pal["panel_bg"]};
     color: {pal["text"]};
     border: 0px;
-    padding: 20px;
+    padding: 0px;
 }}
 QGroupBox {{
     border: 0px;

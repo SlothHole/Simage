@@ -45,7 +45,7 @@ class SettingsTab(QWidget):
         layout = QVBoxLayout(self)
         self._apply_page_layout(layout)
 
-        header = QLabel("Maintenance and setup tools (no terminal required).")
+        header = QLabel("Maintenance and setup tools.")
         header.setWordWrap(True)
         layout.addWidget(header)
 
