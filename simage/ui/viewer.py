@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
     QFrame,
+    QGridLayout,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QListWidgetItem,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QSlider,
     QSplitter,
@@ -31,7 +33,137 @@ from PySide6.QtWidgets import (
 from simage.utils.paths import resolve_repo_path
 from .record_filter import load_records
 from .scanner import IMG_EXTS
-from .theme import load_splitter_sizes, save_splitter_sizes
+from .theme import (  # DIFF-001-001
+    UI_INNER_GAP,  # DIFF-001-001
+    UI_OUTER_PADDING,  # DIFF-001-001
+    UI_SECTION_GAP,  # DIFF-001-001
+    load_splitter_sizes,  # DIFF-001-001
+    save_splitter_sizes,  # DIFF-001-001
+)
+
+EDIT_SLIDER_SECTIONS = [
+    (
+        "Basic tone",
+        [
+            {"key": "exposure", "label": "Exposure", "min": -5.0, "max": 5.0, "step": 0.1, "default": 0.0, "scale": 10},
+            {"key": "brightness", "label": "Brightness", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "contrast", "label": "Contrast", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "gamma", "label": "Gamma", "min": 0.1, "max": 3.0, "step": 0.1, "default": 1.0, "scale": 10},
+            {"key": "black_point", "label": "Black Point", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "white_point", "label": "White Point", "min": -100, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+    (
+        "Highlights & shadows",
+        [
+            {"key": "highlights", "label": "Highlights", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "shadows", "label": "Shadows", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "whites", "label": "Whites", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "blacks", "label": "Blacks", "min": -100, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+    (
+        "Color / white balance",
+        [
+            {
+                "key": "temperature",
+                "label": "Temperature (Kelvin / Warmth)",
+                "min": 2000,
+                "max": 12000,
+                "step": 100,
+                "default": 6500,
+                "scale": 1,
+                "suffix": " K",
+            },
+            {"key": "tint", "label": "Tint (Green-Magenta)", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "saturation", "label": "Saturation", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "vibrance", "label": "Vibrance", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "hue", "label": "Hue", "min": -180, "max": 180, "step": 1, "default": 0, "suffix": " deg"},
+        ],
+    ),
+    (
+        "Detail / sharpness",
+        [
+            {"key": "sharpening", "label": "Sharpening", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "sharpen_radius", "label": "Sharpen Radius", "min": 0.1, "max": 5.0, "step": 0.1, "default": 1.0, "scale": 10},
+            {"key": "sharpen_amount", "label": "Sharpen Amount", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "sharpen_threshold", "label": "Sharpen Threshold", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "detail", "label": "Detail", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "edge_masking", "label": "Edge Masking", "min": 0, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+    (
+        "Texture / micro-contrast",
+        [
+            {"key": "clarity", "label": "Clarity", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "texture", "label": "Texture", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "structure", "label": "Structure", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "midtone_contrast", "label": "Midtone Contrast", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "local_contrast", "label": "Local Contrast", "min": -100, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+    (
+        "Noise / smoothing",
+        [
+            {"key": "noise_reduction_luma", "label": "Noise Reduction (Luminance)", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "noise_reduction_color", "label": "Noise Reduction (Color)", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "denoise_amount", "label": "Denoise Amount", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "denoise_detail", "label": "Denoise Detail", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "grain_reduction", "label": "Grain Reduction", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "skin_smoothing", "label": "Smoothing / Skin Smoothing", "min": 0, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+    (
+        "Dehaze / atmospheric",
+        [
+            {"key": "dehaze", "label": "Dehaze", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "haze_removal", "label": "Haze Removal", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "defog", "label": "Defog", "min": -100, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+    (
+        "Effects",
+        [
+            {"key": "vignette", "label": "Vignette", "min": -100, "max": 100, "step": 1, "default": 0},
+            {"key": "fade", "label": "Fade", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "grain", "label": "Grain", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "glow", "label": "Glow / Bloom", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "lens_blur", "label": "Lens Blur", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "motion_blur", "label": "Motion Blur", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "unsharp_mask", "label": "Sharpen (Unsharp Mask)", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "high_pass", "label": "High Pass", "min": 0, "max": 100, "step": 1, "default": 0},
+            {"key": "clarity_pop", "label": "Clarity/Pop", "min": 0, "max": 100, "step": 1, "default": 0},
+        ],
+    ),
+]
+
+EDIT_PLACEHOLDER_SECTIONS = [
+    ("Tone curve", ["Tone Curve (RGB)", "Channel Curves (R / G / B)"]),
+    ("HSL / color mix", ["Hue (per color)", "Saturation (per color)", "Luminance (per color)"]),
+    (
+        "Color grading",
+        [
+            "Shadows Color",
+            "Midtones Color",
+            "Highlights Color",
+            "Balance",
+            "Split Toning (Highlight Hue/Sat, Shadow Hue/Sat)",
+        ],
+    ),
+    ("Levels / channel controls", ["Levels (Input/Output)", "RGB Levels", "Individual Channel Levels"]),
+    (
+        "Geometry / transform",
+        [
+            "Crop",
+            "Rotate",
+            "Straighten",
+            "Perspective (Vertical/Horizontal)",
+            "Distort / Warp",
+            "Scale",
+            "Flip Horizontal / Vertical",
+        ],
+    ),
+]
 
 
 class ZoomableImageView(QGraphicsView):
@@ -176,9 +308,11 @@ class ViewerTab(QWidget):
             "Images",
             refresh=True,
         )
+        self.single_list_panel.setMinimumWidth(240)  # DIFF-001-003
         self.single_list.itemSelectionChanged.connect(self._on_single_selected)
 
         viewer_panel = QGroupBox("Viewer")
+        viewer_panel.setMinimumWidth(480)  # DIFF-001-003
         viewer_layout = QVBoxLayout(viewer_panel)
         self._apply_section_layout(viewer_layout)
         viewer_header = QHBoxLayout()
@@ -199,12 +333,14 @@ class ViewerTab(QWidget):
         splitter.addWidget(self.single_list_panel)
         splitter.addWidget(viewer_panel)
         self._init_splitter(splitter, "viewer/single", [280, 820])
+        splitter.setStretchFactor(0, 1)  # DIFF-001-005
+        splitter.setStretchFactor(1, 3)  # DIFF-001-005
         layout.addWidget(splitter)
 
     def _build_compare_tab(self) -> None:
         layout = QVBoxLayout(self.compare_tab)
         self._apply_tab_layout(layout)
-        layout.setSpacing(12)
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
         refresh_row = QHBoxLayout()
         refresh_btn = QPushButton("Refresh image list")
@@ -220,6 +356,7 @@ class ViewerTab(QWidget):
         splitter = QSplitter(Qt.Horizontal)
 
         left_panel = QGroupBox("Left Image")
+        left_panel.setMinimumWidth(480)  # DIFF-001-003
         left_layout = QVBoxLayout(left_panel)
         self._apply_section_layout(left_layout)
         left_header = QHBoxLayout()
@@ -237,15 +374,18 @@ class ViewerTab(QWidget):
             "Select Left",
             refresh=False,
         )
+        self.left_list_panel.setMinimumWidth(240)  # DIFF-001-003
         self.compare_left_list.itemSelectionChanged.connect(self._on_compare_left_selected)
 
         self.right_list_panel, self.compare_right_list, self.compare_right_filter = self._create_list_panel(
             "Select Right",
             refresh=False,
         )
+        self.right_list_panel.setMinimumWidth(240)  # DIFF-001-003
         self.compare_right_list.itemSelectionChanged.connect(self._on_compare_right_selected)
 
         right_panel = QGroupBox("Right Image")
+        right_panel.setMinimumWidth(480)  # DIFF-001-003
         right_layout = QVBoxLayout(right_panel)
         self._apply_section_layout(right_layout)
         right_header = QHBoxLayout()
@@ -263,7 +403,11 @@ class ViewerTab(QWidget):
         splitter.addWidget(left_panel)
         splitter.addWidget(right_panel)
         splitter.addWidget(self.right_list_panel)
-        self._init_splitter(splitter, "viewer/compare", [220, 420, 420, 220])
+        self._init_splitter(splitter, "viewer/compare", [240, 480, 480, 240])  # DIFF-001-005
+        splitter.setStretchFactor(0, 1)  # DIFF-001-005
+        splitter.setStretchFactor(1, 3)  # DIFF-001-005
+        splitter.setStretchFactor(2, 3)  # DIFF-001-005
+        splitter.setStretchFactor(3, 1)  # DIFF-001-005
         layout.addWidget(splitter)
 
     def _build_edit_tab(self) -> None:
@@ -276,10 +420,12 @@ class ViewerTab(QWidget):
             "Images",
             refresh=True,
         )
+        self.edit_list_panel.setMinimumWidth(240)  # DIFF-001-003
         self.edit_list.itemSelectionChanged.connect(self._on_edit_selected)
         splitter.addWidget(self.edit_list_panel)
 
         preview_panel = QGroupBox("Preview")
+        preview_panel.setMinimumWidth(480)  # DIFF-001-003
         preview_layout = QVBoxLayout(preview_panel)
         self._apply_section_layout(preview_layout)
         preview_header = QHBoxLayout()
@@ -295,7 +441,7 @@ class ViewerTab(QWidget):
         controls_panel = QWidget()
         controls_layout = QVBoxLayout(controls_panel)
         controls_layout.setContentsMargins(0, 0, 0, 0)
-        controls_layout.setSpacing(20)
+        controls_layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
         zoom_panel = QGroupBox("Zoom")
         zoom_layout = QVBoxLayout(zoom_panel)
@@ -306,18 +452,7 @@ class ViewerTab(QWidget):
         adjustments_panel = QGroupBox("Adjustments")
         adjustments_layout = QVBoxLayout(adjustments_panel)
         self._apply_section_layout(adjustments_layout)
-        self.brightness_slider, self.brightness_value = self._build_adjustment_row(
-            "Brightness",
-            adjustments_layout,
-        )
-        self.contrast_slider, self.contrast_value = self._build_adjustment_row(
-            "Contrast",
-            adjustments_layout,
-        )
-        self.saturation_slider, self.saturation_value = self._build_adjustment_row(
-            "Saturation",
-            adjustments_layout,
-        )
+        self._build_adjustment_controls(adjustments_layout)
 
         action_row = QHBoxLayout()
         self.reset_adjustments_btn = QPushButton("Reset Adjustments")
@@ -350,13 +485,18 @@ class ViewerTab(QWidget):
         controls_layout.addStretch(1)
 
         splitter.addWidget(preview_panel)
-        splitter.addWidget(controls_panel)
+        controls_scroll = QScrollArea()  # DIFF-001-004
+        controls_scroll.setWidgetResizable(True)  # DIFF-001-004
+        controls_scroll.setFrameShape(QFrame.NoFrame)  # DIFF-001-004
+        controls_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # DIFF-001-004
+        controls_scroll.setWidget(controls_panel)  # DIFF-001-004
+        controls_scroll.setMinimumWidth(320)  # DIFF-001-003
+        splitter.addWidget(controls_scroll)  # DIFF-001-004
         self._init_splitter(splitter, "viewer/edit", [260, 760, 320])
+        splitter.setStretchFactor(0, 1)  # DIFF-001-005
+        splitter.setStretchFactor(1, 3)  # DIFF-001-005
+        splitter.setStretchFactor(2, 1)  # DIFF-001-005
         layout.addWidget(splitter)
-
-        self._wire_adjustment_slider(self.brightness_slider, self.brightness_value)
-        self._wire_adjustment_slider(self.contrast_slider, self.contrast_value)
-        self._wire_adjustment_slider(self.saturation_slider, self.saturation_value)
 
     def _create_list_panel(self, title: str, refresh: bool) -> tuple[QGroupBox, QListWidget, QLineEdit]:
         panel = QGroupBox(title)
@@ -580,23 +720,179 @@ class ViewerTab(QWidget):
             return image
         return image.scaled(max_dim, max_dim, Qt.KeepAspectRatio, Qt.SmoothTransformation)
 
-    def _build_adjustment_row(self, label: str, parent_layout: QVBoxLayout) -> tuple[QSlider, QLabel]:
+    def _build_adjustment_controls(self, parent_layout: QVBoxLayout) -> None:
+        self._adjustment_sliders = {}
+        self._adjustment_value_labels = {}
+        self._adjustment_defaults = {}
+        self._adjustment_scales = {}
+        self._adjustment_suffixes = {}
+
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        container = QWidget()
+        container_layout = QVBoxLayout(container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        container_layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
+        scroll.setWidget(container)
+        parent_layout.addWidget(scroll, 1)
+
+        for section_label, adjustments in EDIT_SLIDER_SECTIONS:
+            self._add_adjustment_section_label(container_layout, section_label)
+            for adj in adjustments:
+                slider, value_label = self._build_adjustment_row(
+                    adj["label"],
+                    container_layout,
+                    min_val=adj.get("min", -100),
+                    max_val=adj.get("max", 100),
+                    step=adj.get("step", 1),
+                    default=adj.get("default", 0),
+                    scale=adj.get("scale", 1),
+                    suffix=adj.get("suffix", ""),
+                )
+                self._register_adjustment_slider(adj["key"], slider, value_label, adj)
+            container_layout.addSpacing(6)
+
+        self._add_adjustment_section_label(container_layout, "Brush (placeholder)")
+        self._build_brush_controls(container_layout)
+        container_layout.addSpacing(6)
+
+        for section_label, buttons in EDIT_PLACEHOLDER_SECTIONS:
+            self._add_adjustment_section_label(container_layout, f"{section_label} (placeholder)")
+            self._add_placeholder_buttons(container_layout, buttons)
+            container_layout.addSpacing(6)
+
+        container_layout.addStretch(1)
+
+    def _add_adjustment_section_label(self, parent_layout: QVBoxLayout, text: str) -> None:
+        label = QLabel(text)
+        label.setStyleSheet("font-weight: 600;")
+        parent_layout.addWidget(label)
+
+    def _add_placeholder_buttons(self, parent_layout: QVBoxLayout, labels: List[str]) -> None:
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(8)
+        grid.setVerticalSpacing(8)
+        for idx, text in enumerate(labels):
+            row = idx // 2
+            col = idx % 2
+            btn = QPushButton(text)
+            self._standard_button(btn)
+            btn.setEnabled(False)
+            btn.setToolTip("Placeholder control.")
+            grid.addWidget(btn, row, col)
+        parent_layout.addLayout(grid)
+
+    def _build_brush_controls(self, parent_layout: QVBoxLayout) -> None:
+        brush_row = QHBoxLayout()
+        brush_row.addWidget(QLabel("Brush"))
+        self.brush_toggle = QPushButton("Enable")
+        self.brush_toggle.setCheckable(True)
+        self._standard_button(self.brush_toggle)
+        brush_row.addWidget(self.brush_toggle)
+        brush_row.addStretch(1)
+        parent_layout.addLayout(brush_row)
+
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Brush Size"))
+        self.brush_size_slider = QSlider(Qt.Horizontal)
+        self.brush_size_slider.setRange(1, 200)
+        self.brush_size_slider.setValue(40)
+        self.brush_size_slider.setSingleStep(1)
+        self.brush_size_value = QLabel("40 px")
+        self.brush_size_value.setMinimumWidth(56)
+        self.brush_preview = QLabel()
+        self._set_brush_preview_size(40)
+        size_row.addWidget(self.brush_size_slider)
+        size_row.addWidget(self.brush_size_value)
+        size_row.addWidget(self.brush_preview)
+        size_row.addStretch(1)
+        parent_layout.addLayout(size_row)
+
+        self.brush_size_slider.valueChanged.connect(self._on_brush_size_changed)
+
+    def _set_brush_preview_size(self, size: int) -> None:
+        preview_size = max(6, min(60, size))
+        radius = preview_size // 2
+        self.brush_preview.setFixedSize(preview_size, preview_size)
+        self.brush_preview.setStyleSheet(
+            f"border: 1px solid #666; border-radius: {radius}px;"
+        )
+
+    def _on_brush_size_changed(self, value: int) -> None:
+        self.brush_size_value.setText(f"{value} px")
+        self._set_brush_preview_size(value)
+
+    def _register_adjustment_slider(
+        self,
+        key: str,
+        slider: QSlider,
+        value_label: QLabel,
+        config: dict,
+    ) -> None:
+        scale = config.get("scale", 1)
+        suffix = config.get("suffix", "")
+        default = config.get("default", 0)
+        self._adjustment_sliders[key] = slider
+        self._adjustment_value_labels[key] = value_label
+        self._adjustment_scales[key] = scale
+        self._adjustment_suffixes[key] = suffix
+        self._adjustment_defaults[key] = int(round(default * scale))
+        if key == "brightness":
+            self.brightness_slider = slider
+            self.brightness_value = value_label
+        elif key == "contrast":
+            self.contrast_slider = slider
+            self.contrast_value = value_label
+        elif key == "saturation":
+            self.saturation_slider = slider
+            self.saturation_value = value_label
+        self._wire_adjustment_slider(slider)
+
+    def _build_adjustment_row(
+        self,
+        label: str,
+        parent_layout: QVBoxLayout,
+        min_val: float = -100,
+        max_val: float = 100,
+        step: float = 1,
+        default: float = 0,
+        scale: int = 1,
+        suffix: str = "",
+    ) -> tuple[QSlider, QLabel]:
         row = QHBoxLayout()
         row.addWidget(QLabel(label))
         slider = QSlider(Qt.Horizontal)
-        slider.setRange(-100, 100)
-        slider.setValue(0)
-        slider.setSingleStep(5)
-        value_label = QLabel("0")
-        value_label.setMinimumWidth(32)
+        slider.setRange(int(round(min_val * scale)), int(round(max_val * scale)))
+        slider.setValue(int(round(default * scale)))
+        slider.setSingleStep(int(round(step * scale)))
+        value_label = QLabel("")
+        value_label.setMinimumWidth(56)
+        value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self._set_adjustment_value_label(value_label, slider.value(), scale, suffix)
+        slider.valueChanged.connect(
+            lambda val, lbl=value_label, sc=scale, suf=suffix: self._set_adjustment_value_label(
+                lbl, val, sc, suf
+            )
+        )
         row.addWidget(slider)
         row.addWidget(value_label)
         row.addStretch(1)
         parent_layout.addLayout(row)
         return slider, value_label
 
-    def _wire_adjustment_slider(self, slider: QSlider, value_label: QLabel) -> None:
-        slider.valueChanged.connect(lambda val: value_label.setText(str(val)))
+    def _set_adjustment_value_label(self, label: QLabel, raw: int, scale: int, suffix: str) -> None:
+        if scale == 1:
+            text = str(raw)
+        else:
+            decimals = 0
+            if scale in (10, 100, 1000):
+                decimals = len(str(scale)) - 1
+            value = raw / scale
+            text = f"{value:.{decimals}f}".rstrip("0").rstrip(".")
+        label.setText(f"{text}{suffix}")
+
+    def _wire_adjustment_slider(self, slider: QSlider) -> None:
         slider.valueChanged.connect(lambda _val: self._schedule_edit_preview())
 
     def _schedule_edit_preview(self) -> None:
@@ -614,18 +910,20 @@ class ViewerTab(QWidget):
         self.edit_view.set_image_data(adjusted, preserve_zoom=True)
 
     def _reset_adjustments(self, update_preview: bool = True) -> None:
-        self.brightness_slider.blockSignals(True)
-        self.contrast_slider.blockSignals(True)
-        self.saturation_slider.blockSignals(True)
-        self.brightness_slider.setValue(0)
-        self.contrast_slider.setValue(0)
-        self.saturation_slider.setValue(0)
-        self.brightness_slider.blockSignals(False)
-        self.contrast_slider.blockSignals(False)
-        self.saturation_slider.blockSignals(False)
-        self.brightness_value.setText("0")
-        self.contrast_value.setText("0")
-        self.saturation_value.setText("0")
+        if not hasattr(self, "_adjustment_sliders"):
+            return
+        for key, slider in self._adjustment_sliders.items():
+            slider.blockSignals(True)
+            slider.setValue(self._adjustment_defaults.get(key, 0))
+            slider.blockSignals(False)
+            label = self._adjustment_value_labels.get(key)
+            if label:
+                self._set_adjustment_value_label(
+                    label,
+                    slider.value(),
+                    self._adjustment_scales.get(key, 1),
+                    self._adjustment_suffixes.get(key, ""),
+                )
         if update_preview and self._edit_preview_base:
             self.edit_view.set_image_data(self._edit_preview_base, preserve_zoom=True)
 
@@ -717,16 +1015,16 @@ class ViewerTab(QWidget):
         button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(40, 16, 40, 20)
-        layout.setSpacing(20)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-001-001
 
     def _apply_tab_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(28)
+        layout.setContentsMargins(0, 0, 0, 0)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)

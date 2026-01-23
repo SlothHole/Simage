@@ -25,7 +25,13 @@ from PySide6.QtWidgets import (
 )
 
 from simage.utils.paths import resolve_repo_path
-from .theme import load_splitter_sizes, save_splitter_sizes
+from .theme import (  # DIFF-001-001
+    UI_INNER_GAP,  # DIFF-001-001
+    UI_OUTER_PADDING,  # DIFF-001-001
+    UI_SECTION_GAP,  # DIFF-001-001
+    load_splitter_sizes,  # DIFF-001-001
+    save_splitter_sizes,  # DIFF-001-001
+)
 
 
 class DatabaseViewerTab(QWidget):
@@ -92,6 +98,7 @@ class DatabaseViewerTab(QWidget):
         self.sql_input = QPlainTextEdit()
         self.sql_input.setPlaceholderText("Write SQL here. Example: SELECT * FROM images LIMIT 50;")
         sql_panel = QWidget()
+        sql_panel.setMinimumWidth(480)  # DIFF-001-003
         sql_layout = QVBoxLayout(sql_panel)
         self._apply_section_layout(sql_layout)
         sql_header = QHBoxLayout()
@@ -105,6 +112,7 @@ class DatabaseViewerTab(QWidget):
         editor_split.addWidget(sql_panel)
 
         history_panel = QWidget()
+        history_panel.setMinimumWidth(240)  # DIFF-001-003
         history_layout = QVBoxLayout(history_panel)
         self._apply_section_layout(history_layout)
         history_header = QHBoxLayout()
@@ -119,6 +127,8 @@ class DatabaseViewerTab(QWidget):
         history_layout.addWidget(self.history_list)
         editor_split.addWidget(history_panel)
         self._init_splitter(editor_split, "db/editor", [700, 240])
+        editor_split.setStretchFactor(0, 3)  # DIFF-001-005
+        editor_split.setStretchFactor(1, 1)  # DIFF-001-005
 
         run_row = QHBoxLayout()
         self.limit_spin = QSpinBox()
@@ -172,6 +182,8 @@ class DatabaseViewerTab(QWidget):
         results_layout.addWidget(self.table)
         vertical_split.addWidget(results_panel)
         self._init_splitter(vertical_split, "db/vertical", [240, 520])
+        vertical_split.setStretchFactor(0, 1)  # DIFF-001-005
+        vertical_split.setStretchFactor(1, 3)  # DIFF-001-005
         layout.addWidget(vertical_split)
 
     def _help_button(self, text: str) -> QToolButton:
@@ -184,12 +196,12 @@ class DatabaseViewerTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(28)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-001-001
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)

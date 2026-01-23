@@ -19,6 +19,9 @@ from .settings import SettingsTab
 from .viewer import ViewerTab
 from .db_viewer import DatabaseViewerTab
 from .theme import (
+    UI_INNER_GAP,  # DIFF-001-001
+    UI_OUTER_PADDING,  # DIFF-001-001
+    UI_SECTION_GAP,  # DIFF-001-001
     apply_font,
     apply_theme,
     load_splitter_sizes,
@@ -129,10 +132,11 @@ class TagTab(QWidget):
         top_container = QWidget()
         top_layout = QHBoxLayout(top_container)
         top_layout.setContentsMargins(0, 0, 0, 0)
-        top_layout.setSpacing(20)
+        top_layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
         # Image list panel
         image_panel = QWidget()
+        image_panel.setMinimumWidth(480)  # DIFF-001-003
         image_layout = QVBoxLayout(image_panel)
         self._apply_section_layout(image_layout)
         image_layout.addWidget(
@@ -149,6 +153,7 @@ class TagTab(QWidget):
 
         # Current tags panel
         current_panel = QWidget()
+        current_panel.setMinimumWidth(240)  # DIFF-001-003
         current_layout = QVBoxLayout(current_panel)
         self._apply_section_layout(current_layout)
         current_layout.addWidget(
@@ -171,10 +176,11 @@ class TagTab(QWidget):
         create_add_widget = QWidget()
         create_add_layout = QHBoxLayout(create_add_widget)
         create_add_layout.setContentsMargins(0, 0, 0, 0)
-        create_add_layout.setSpacing(20)
+        create_add_layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
         # Create new tag panel
         new_panel = QWidget()
+        new_panel.setMinimumWidth(240)  # DIFF-001-003
         new_layout = QVBoxLayout(new_panel)
         self._apply_section_layout(new_layout)
         new_layout.addWidget(
@@ -199,6 +205,7 @@ class TagTab(QWidget):
 
         # Custom tag list panel
         custom_panel = QWidget()
+        custom_panel.setMinimumWidth(240)  # DIFF-001-003
         custom_layout = QVBoxLayout(custom_panel)
         self._apply_section_layout(custom_layout)
         custom_layout.addWidget(
@@ -213,6 +220,7 @@ class TagTab(QWidget):
 
         # Add tag panel
         add_panel = QWidget()
+        add_panel.setMinimumWidth(240)  # DIFF-001-003
         add_layout = QVBoxLayout(add_panel)
         self._apply_section_layout(add_layout)
         add_layout.addWidget(
@@ -245,10 +253,11 @@ class TagTab(QWidget):
         edit_widget = QWidget()
         edit_layout = QHBoxLayout(edit_widget)
         edit_layout.setContentsMargins(0, 0, 0, 0)
-        edit_layout.setSpacing(20)
+        edit_layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
         # Edit tag panel
         edit_panel = QWidget()
+        edit_panel.setMinimumWidth(240)  # DIFF-001-003
         edit_panel_layout = QVBoxLayout(edit_panel)
         self._apply_section_layout(edit_panel_layout)
         edit_panel_layout.addWidget(
@@ -271,6 +280,7 @@ class TagTab(QWidget):
 
         # Pending edits panel
         pending_edit_panel = QWidget()
+        pending_edit_panel.setMinimumWidth(240)  # DIFF-001-003
         pending_edit_layout = QVBoxLayout(pending_edit_panel)
         self._apply_section_layout(pending_edit_layout)
         pending_edit_layout.addWidget(
@@ -291,6 +301,7 @@ class TagTab(QWidget):
 
         # Tab 3: Selected Images
         selected_widget = QWidget()
+        selected_widget.setMinimumWidth(240)  # DIFF-001-003
         selected_layout = QVBoxLayout(selected_widget)
         self._apply_section_layout(selected_layout)
         selected_layout.addWidget(
@@ -304,7 +315,9 @@ class TagTab(QWidget):
         operations_tab.addTab(selected_widget, "Selected Images")
 
         # Set splitter proportions: 40% top, 60% operations
-        main_splitter.setSizes([400, 600])
+        main_splitter.setSizes([400, 600])  # DIFF-001-005
+        main_splitter.setStretchFactor(0, 3)  # DIFF-001-005
+        main_splitter.setStretchFactor(1, 1)  # DIFF-001-005
         main_splitter.splitterMoved.connect(
             lambda _pos, _idx: self._save_splitter(main_splitter, "tag/main")
         )
@@ -325,12 +338,12 @@ class TagTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(28)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-001-001
 
     def _save_splitter(self, splitter: QSplitter, key: str) -> None:
         save_splitter_sizes(key, splitter.sizes())

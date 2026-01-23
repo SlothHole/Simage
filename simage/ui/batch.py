@@ -26,6 +26,7 @@ from .csv_edit import amend_records_csv
 from .record_filter import load_records
 from .scanner import IMG_EXTS
 from .thumbnails import THUMB_DIR, ensure_thumbnail, thumbnail_path_for_source
+from .theme import UI_OUTER_PADDING, UI_SECTION_GAP  # DIFF-001-001
 
 
 class BatchTab(QWidget):
@@ -59,6 +60,7 @@ class BatchTab(QWidget):
         layout.addLayout(selected_row)
 
         self.selected_list = QListWidget()
+        self.selected_list.setMinimumWidth(480)  # DIFF-001-003
         layout.addWidget(self.selected_list)
 
         tag_layout = QHBoxLayout()
@@ -139,8 +141,8 @@ class BatchTab(QWidget):
         button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(28)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def set_selected_images(self, image_paths: List[str]) -> None:
         self.selected_images = image_paths

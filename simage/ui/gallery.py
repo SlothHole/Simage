@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QTextEdit,
     QFrame,
     QLineEdit,
+    QScrollArea,  # DIFF-001-004
     QPushButton,
     QComboBox,
     QMenu,
@@ -38,6 +39,9 @@ from .theme import (
     MAX_THUMB_SPACING,
     MIN_THUMB_SIZE,
     MIN_THUMB_SPACING,
+    UI_OUTER_PADDING,  # DIFF-001-001
+    UI_SECTION_GAP,  # DIFF-001-001
+    UI_INNER_GAP,  # DIFF-001-001
     load_ui_settings,
     load_splitter_sizes,
     save_splitter_sizes,
@@ -70,6 +74,7 @@ class GalleryTab(QWidget):
 
         # Left: Search/filter/sort + Thumbnail grid + batch controls + export
         grid_widget = QWidget()
+        grid_widget.setMinimumWidth(480)  # DIFF-001-003
         grid_layout = QVBoxLayout(grid_widget)
         self._apply_section_layout(grid_layout)
 
@@ -214,9 +219,17 @@ class GalleryTab(QWidget):
 
         side_layout.addWidget(detail_splitter)
         side_panel.setLayout(side_layout)
-        splitter.addWidget(side_panel)
+        side_scroll = QScrollArea()  # DIFF-001-004
+        side_scroll.setWidgetResizable(True)  # DIFF-001-004
+        side_scroll.setFrameShape(QFrame.NoFrame)  # DIFF-001-004
+        side_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # DIFF-001-004
+        side_scroll.setWidget(side_panel)  # DIFF-001-004
+        side_scroll.setMinimumWidth(320)  # DIFF-001-003
+        splitter.addWidget(side_scroll)  # DIFF-001-004
 
-        self._init_splitter(splitter, "gallery/main", [900, 300])
+        self._init_splitter(splitter, "gallery/main", [900, 320])  # DIFF-001-005
+        splitter.setStretchFactor(0, 3)  # DIFF-001-005
+        splitter.setStretchFactor(1, 1)  # DIFF-001-005
         main_layout.addWidget(splitter)
         self.setLayout(main_layout)
 
@@ -246,12 +259,12 @@ class GalleryTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QHBoxLayout) -> None:
-        layout.setContentsMargins(5, 5, 5, 5)
-        layout.setSpacing(28)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-001-001
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)

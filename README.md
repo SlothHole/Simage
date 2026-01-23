@@ -107,3 +107,87 @@ UI features:
 ```powershell
 python -m pytest tests
 ```
+
+
+## Change Process (DIFF System)
+
+This repository uses a **DIFF-governed change process** to ensure all modifications are intentional, auditable, and reversible.
+
+### What is a DIFF?
+
+A **DIFF** is a versioned change contract that defines:
+- What is allowed to change
+- What is explicitly forbidden
+- Why the change exists
+- How completion is verified
+
+DIFFs are authoritative.  
+If a change is not explicitly covered by a DIFF, it must not be made.
+
+---
+
+### DIFF Files
+
+DIFFs live in:
+
+docs/diffs/
+DIFF-000.md # Baseline snapshot (read-only)
+DIFF-001.md # First change set
+DIFF-002.md # Subsequent scoped changes
+
+- **DIFF-000** captures the factual baseline and allows no changes.
+- **DIFF-001+** introduce scoped, verified changes.
+- Locked DIFFs are never edited.
+
+---
+
+### How Changes Are Made
+
+1. A DIFF is authored by the repo owner.
+2. Scope is frozen before implementation.
+3. Changes are implemented strictly within DIFF scope.
+4. All changes are verified against the DIFF checklist.
+5. The DIFF is accepted and locked.
+
+Only one DIFF may be active at a time.
+
+---
+
+### What Is Not Allowed
+
+Unless explicitly permitted by a DIFF:
+- Feature movement
+- Renaming
+- Logic or behavior changes
+- Refactors or cleanup
+- Styling or redesign
+- “While I’m here” improvements
+
+If a change seems necessary but is not covered by a DIFF, it must be discussed before proceeding.
+
+---
+
+### Agents and Automation
+
+This repository may use automated agents to implement DIFFs.  
+Agents operate under strict instructions and do not define scope or authorize changes.
+
+All authority remains with the DIFF documents.
+
+---
+
+### Documentation
+
+- `docs/DIFF_PROCESS.md` — DIFF governance rules
+- `docs/DIFF_TEMPLATE.md` — Template for authoring new DIFFs
+- `docs/AGENT_PROMPT.md` — Execution rules for agents (read-only)
+
+---
+
+### Guiding Principle
+
+> **Intent is explicit.  
+> Scope is enforced.  
+> Changes are provable.**
+
+If you are unsure whether a change is allowed, assume it is not and ask first.

@@ -27,6 +27,9 @@ from PySide6.QtWidgets import (
 from simage.utils.paths import resolve_repo_path
 from .theme import (
     DEFAULT_THEME,
+    UI_INNER_GAP,  # DIFF-001-001
+    UI_OUTER_PADDING,  # DIFF-001-001
+    UI_SECTION_GAP,  # DIFF-001-001
     apply_font,
     apply_theme,
     custom_theme_from_settings,
@@ -98,9 +101,9 @@ class SettingsTab(QWidget):
         custom_scroll.setFrameShape(QFrame.NoFrame)
         custom_body = QWidget()
         custom_grid = QGridLayout(custom_body)
-        custom_grid.setContentsMargins(12, 12, 12, 12)
-        custom_grid.setHorizontalSpacing(16)
-        custom_grid.setVerticalSpacing(12)
+        custom_grid.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        custom_grid.setHorizontalSpacing(UI_SECTION_GAP)  # DIFF-001-001
+        custom_grid.setVerticalSpacing(UI_SECTION_GAP)  # DIFF-001-001
         row = 0
         for label_text, section, key in self._custom_color_entries():
             label = QLabel(label_text)
@@ -209,19 +212,37 @@ class SettingsTab(QWidget):
         display_tab = QWidget()
         display_tab_layout = QVBoxLayout(display_tab)
         self._apply_tab_layout(display_tab_layout)
-        display_tab_layout.addWidget(display_group)
+        display_scroll = QScrollArea()  # DIFF-001-004
+        display_scroll.setWidgetResizable(True)  # DIFF-001-004
+        display_scroll.setFrameShape(QFrame.NoFrame)  # DIFF-001-004
+        display_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # DIFF-001-004
+        display_scroll.setWidget(display_group)  # DIFF-001-004
+        display_scroll.setMinimumWidth(480)  # DIFF-001-003
+        display_tab_layout.addWidget(display_scroll)  # DIFF-001-004
         display_tab_layout.addStretch(1)
 
         env_tab = QWidget()
         env_tab_layout = QVBoxLayout(env_tab)
         self._apply_tab_layout(env_tab_layout)
-        env_tab_layout.addWidget(env_group)
+        env_scroll = QScrollArea()  # DIFF-001-004
+        env_scroll.setWidgetResizable(True)  # DIFF-001-004
+        env_scroll.setFrameShape(QFrame.NoFrame)  # DIFF-001-004
+        env_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # DIFF-001-004
+        env_scroll.setWidget(env_group)  # DIFF-001-004
+        env_scroll.setMinimumWidth(480)  # DIFF-001-003
+        env_tab_layout.addWidget(env_scroll)  # DIFF-001-004
         env_tab_layout.addStretch(1)
 
         pipeline_tab = QWidget()
         pipeline_tab_layout = QVBoxLayout(pipeline_tab)
         self._apply_tab_layout(pipeline_tab_layout)
-        pipeline_tab_layout.addWidget(pipeline_group)
+        pipeline_scroll = QScrollArea()  # DIFF-001-004
+        pipeline_scroll.setWidgetResizable(True)  # DIFF-001-004
+        pipeline_scroll.setFrameShape(QFrame.NoFrame)  # DIFF-001-004
+        pipeline_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # DIFF-001-004
+        pipeline_scroll.setWidget(pipeline_group)  # DIFF-001-004
+        pipeline_scroll.setMinimumWidth(480)  # DIFF-001-003
+        pipeline_tab_layout.addWidget(pipeline_scroll)  # DIFF-001-004
         pipeline_tab_layout.addStretch(1)
 
         self.tabs.addTab(display_tab, "Display")
@@ -250,16 +271,16 @@ class SettingsTab(QWidget):
         button.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(28)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-001-001
 
     def _apply_tab_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(28)
+        layout.setContentsMargins(0, 0, 0, 0)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _on_theme_changed(self, theme_name: str) -> None:
         if not self._display_ready:

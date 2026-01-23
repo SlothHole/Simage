@@ -33,6 +33,7 @@ from PySide6.QtWidgets import (
 )
 
 from simage.utils.paths import resolve_repo_path
+from .theme import UI_INNER_GAP, UI_OUTER_PADDING, UI_SECTION_GAP  # DIFF-001-001
 from .theme import theme_color
 from .theme import load_splitter_sizes, save_splitter_sizes
 
@@ -201,7 +202,7 @@ class EditTab(QWidget):
         left_container = QWidget()
         left_layout = QVBoxLayout(left_container)
         left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.setSpacing(20)
+        left_layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
         left_layout.addWidget(selected_panel)
         left_layout.addWidget(anchor_panel)
         left_layout.addWidget(matches_panel)
@@ -211,8 +212,10 @@ class EditTab(QWidget):
         left_scroll.setWidgetResizable(True)
         left_scroll.setFrameShape(QFrame.NoFrame)
         left_scroll.setWidget(left_container)
+        left_scroll.setMinimumWidth(240)  # DIFF-001-003
 
         workflow_panel = QGroupBox("Workflow")
+        workflow_panel.setMinimumWidth(480)  # DIFF-001-003
         workflow_layout = QVBoxLayout(workflow_panel)
         self._apply_section_layout(workflow_layout)
         workflow_help = QHBoxLayout()
@@ -225,8 +228,8 @@ class EditTab(QWidget):
 
         main_splitter.addWidget(left_scroll)
         main_splitter.addWidget(workflow_panel)
-        main_splitter.setStretchFactor(0, 1)
-        main_splitter.setStretchFactor(1, 3)
+        main_splitter.setStretchFactor(0, 1)  # DIFF-001-005
+        main_splitter.setStretchFactor(1, 3)  # DIFF-001-005
         self._init_splitter(main_splitter, "edit/main", [360, 840])
 
         file_actions_panel = QGroupBox("File Actions")
@@ -402,12 +405,12 @@ class EditTab(QWidget):
         return btn
 
     def _apply_page_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(40, 40, 40, 40)
-        layout.setSpacing(28)
+        layout.setContentsMargins(UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING, UI_OUTER_PADDING)  # DIFF-001-001
+        layout.setSpacing(UI_SECTION_GAP)  # DIFF-001-001
 
     def _apply_section_layout(self, layout: QVBoxLayout) -> None:
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(16)
+        layout.setContentsMargins(UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP, UI_SECTION_GAP)  # DIFF-001-001
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-001-001
 
     def _init_splitter(self, splitter: QSplitter, key: str, fallback: list[int]) -> None:
         sizes = load_splitter_sizes(key)
