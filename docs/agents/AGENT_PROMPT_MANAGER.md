@@ -26,7 +26,7 @@ You are the last checkpoint before the owner.
 
 Before reviewing, you must have all of the following:
 
-The active DIFF document
+The active DIFF document, find it in the diff dir
 (e.g. docs/diffs/DIFF-001.md)
 
 The implementer’s completion report

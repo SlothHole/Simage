@@ -1,12 +1,12 @@
 DIFF-003 — Implement Full Image Edit Pipeline with Non-Destructive Workflow
 
-Status: ☐ Draft ☐ In Progress ☐ Complete ☐ Locked
+Status: ☐ Draft ✅ In Progress ☐ Complete ☐ Locked
 Depends on: None
 Risk Level: ☐ Low ☐ Medium ☑ High
 
-Author (Intent Owner): ____________________
+Author (Intent Owner): Slothbucket____________________
 Implementer (Agent): ____________________
-Date Created: ____________________
+Date Created: ____2026\23\01_18:09:00___________
 Date Completed: ____________________
 
 0. DIFF Declaration (Read First)
@@ -223,49 +223,49 @@ All boxes must be checked before marking DIFF complete.
 
 Structural Verification
 
-☐ Only DIFF-scoped changes were made
+☑ Only DIFF-scoped changes were made
 
-☐ No changes outside allowed scope
+☑ No changes outside allowed scope
 
-☐ No forbidden actions occurred
+☑ No forbidden actions occurred
 
-☐ DIFF numbering and order respected
+☑ DIFF numbering and order respected
 
 Functional Safety
 
-☐ All existing visible edit controls in Full Image Viewer are functional
+☑ All existing visible edit controls in Full Image Viewer are functional
 
-☐ All controls apply to the in-memory working copy only
+☑ All controls apply to the in-memory working copy only
 
-☐ Live preview updates immediately on control changes
+☑ Live preview updates immediately on control changes
 
-☐ Reset returns working copy to the original state
+☑ Reset returns working copy to the original state
 
-☐ Undo/redo operates on the working copy
+☑ Undo/redo operates on the working copy
 
-☐ Default save action is Save As (new file)
+☑ Default save action is Save As (new file)
 
-☐ Overwrite original requires explicit confirmation and is never silent
+☑ Overwrite original requires explicit confirmation and is never silent
 
-☐ “Affect copy only / keep original” option is visible and default enabled
+☑ “Affect copy only / keep original” option is visible and default enabled
 
-☐ No crashes or freezes during normal editing and saving
+☑ No crashes or freezes during normal editing and saving
 
 UI / Layout Verification (if applicable)
 
-☐ UI changes limited to enabling existing controls and Output / Save Options section
+☑ UI changes limited to enabling existing controls and Output / Save Options section
 
-☐ Output / Save Options appear in the right-side settings rail and are clearly labeled
+☑ Output / Save Options appear in the right-side settings rail and are clearly labeled
 
 Code Hygiene
 
-☐ Every change is tagged with a DIFF tag
+☑ Every change is tagged with a DIFF tag
 
-☐ No untagged edits
+☑ No untagged edits
 
-☐ Tags match this DIFF number
+☑ Tags match this DIFF number
 
-☐ Changes are logically grouped by tag
+☑ Changes are logically grouped by tag
 
 If any box is unchecked, the DIFF is not complete.
 
@@ -274,31 +274,49 @@ If any box is unchecked, the DIFF is not complete.
 To be filled by the implementing agent.
 
 Summary of Changes:
+Implemented a non-destructive edit pipeline for the Full Image Viewer, wiring all visible controls (including brush, placeholders, and save options) to live preview, undo/redo, and explicit overwrite confirmation while keeping the UI minimal.
 
 DIFF Tags Implemented:
 
-☐ DIFF-003-001
+☑ DIFF-003-001
 
-☐ DIFF-003-002
+☑ DIFF-003-002
 
-☐ DIFF-003-003
+☑ DIFF-003-003
 
-☐ DIFF-003-004
+☑ DIFF-003-004
 
-☐ DIFF-003-005
+☑ DIFF-003-005
 
-☐ DIFF-003-006
+☑ DIFF-003-006
 
-☐ DIFF-003-007
+☑ DIFF-003-007
 
-☐ DIFF-003-008
+☑ DIFF-003-008
 
 Verification Performed By Agent:
 
-☐ Yes ☐ No
+☑ Yes ☐ No
 
-Agent Name: ____________________
-Date: ____________________
+Agent Name: Codex
+Date: 2026-01-23
+
+Evidence:
+- docs/evidence/DIFF-003-01-baseline.png
+- docs/evidence/DIFF-003-02-live-preview.png
+- docs/evidence/DIFF-003-03-brush.png
+- docs/evidence/DIFF-003-04-undo.png
+- docs/evidence/DIFF-003-05-redo.png
+- docs/evidence/DIFF-003-06-saveas-dialog.png
+- docs/evidence/DIFF-003-07-overwrite-confirm.png
+- docs/evidence/DIFF-003-08-post-save.png
+
+UI verification notes:
+- Live preview: brightness change reflected immediately (DIFF-003-02).
+- Brush edits: localized application on right image (DIFF-003-03).
+- Undo/redo: right image toggles brush edits (DIFF-003-04, DIFF-003-05).
+- Save As confirmation shown with keep-original enabled (DIFF-003-06).
+- Overwrite confirmation shown when keep-original disabled (DIFF-003-07).
 
 Agent attests that changes were made only within DIFF scope.
 
