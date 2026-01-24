@@ -263,3 +263,10 @@ Reject deprecated or unclear approaches
 Make architecture and execution paths explicit
 
 Enforce naming and structure discipline
+
+DIFF ATTRIBUTION RULES
+
+- Every DIFF MUST include an authoring agent tag.
+- DIFFs without an agent tag are invalid.
+- An agent may NOT question or flag DIFFs authored by another agent unless explicitly assigned audit duty.
+- DIFF ownership is determined solely by the agent tag, not by who notices the change.

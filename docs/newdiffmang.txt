@@ -1,0 +1,132 @@
+Peeon
+
+“Read docs/diffs/DIFF-00X.md”
+
+“Read implementer’s completion report”
+
+“Review actual changes (diff/PR or file changes)”
+
+“Decide: APPROVE / REQUEST CHANGES / REJECT”
+
+“If REQUEST CHANGES: give exact actionable items, tied to DIFF sections”
+
+
+manager
+
+5) What you need to provide the Manager so it can actually judge “looks worse”
+
+The manager can’t guess. Give it at least one of these:
+
+Screenshots (best): before/after for the bad spots
+
+Or a short list of exact panels:
+
+“Viewer > Edit tab right rail is too spaced out”
+
+“Settings > X tab scroll feels wrong”
+
+Or a screen recording showing resize behavior and where it feels bad
+
+Without this, the manager will only validate mechanical correctness (min widths, scroll, splitters).
+
+
+
+MANAGER REVIEW REQUEST
+
+Active DIFF: docs/diffs/DIFF-001.md
+
+Rules: Follow docs/agents/AGENT_PROMPT_MANAGER.md strictly.
+
+Implementer completion report (paste below):
+
+PASTE IMPLEMENTER REPORT HERE
+
+Review requirements:
+
+Confirm no scope violations
+
+Confirm DIFF tagging coverage
+
+Confirm verification checklist is realistically satisfied
+
+If UI looks worse anywhere: identify specific locations and prescribe DIFF-allowed refinements or require DIFF-002
+
+Output format:
+
+Decision: APPROVE / REQUEST CHANGES / REJECT
+
+Findings (bullet list)
+
+Required actions (if any) with exact file + location guidance
+
+“OK to lock DIFF” = Yes/No
+
+
+What the Manager sends back to the Implementer (copy/paste template)
+If it’s acceptable
+
+Decision: APPROVE
+
+Scope: OK
+
+Tagging: OK
+
+Checklist: OK
+Owner may lock DIFF.
+
+If “technically correct but looks worse”
+
+Decision: REQUEST CHANGES
+Required actions (DIFF-allowed only):
+
+File: viewer.py — reduce excessive vertical gap in Edit rail by adjusting [specific layout section] from UI_SECTION_GAP to UI_INNER_GAP.
+
+File: settings.py — scrollbar appears too early; set scroll area widget resizable and ensure only bodies are scrollable, not the full tab container.
+Constraints:
+
+Do not remove min widths
+
+Do not remove scroll areas
+
+No signal/logic changes
+When done, re-submit completion report with updated tag list.
+
+If it’s out of scope / broke rules
+
+Decision: REJECT
+Reason:
+
+Scope violation found: [exact file/line/behavior]
+Action:
+
+Revert offending changes
+
+Re-submit under correct DIFF or open DIFF-002
+
+
+
+
+6) The rule that stops the all-night loop
+
+If the complaint is aesthetic (density/balance/feel), manager must choose:
+
+DIFF-001 still in progress: request targeted refinements if DIFF-001 allows them
+
+DIFF-001 already satisfies scope but looks worse: manager mandates DIFF-002 (visual refinement DIFF)
+
+This prevents endless churn inside the wrong DIFF.
+
+
+7) Minimal “manager agent” prompt content (what it must enforce)
+
+Your manager prompt must explicitly state:
+
+Manager does not implement
+
+Manager rejects scope creep
+
+Manager requires evidence for “looks worse” (screens/panels)
+
+Manager can require a new DIFF for aesthetic changes
+
+If you want, paste your current AGENT_PROMPT_MANAGER.md and I’ll tighten it so it’s strict and actually effective.

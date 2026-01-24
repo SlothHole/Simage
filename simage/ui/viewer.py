@@ -283,21 +283,131 @@ class ViewerTab(QWidget):
         layout = QVBoxLayout(self)
         self._apply_page_layout(layout)
 
-        self.tabs = QTabWidget()
-        layout.addWidget(self.tabs)
+        self._build_unified_viewer(layout)  # DIFF-002-001
 
-        self.single_tab = QWidget()
-        self.compare_tab = QWidget()
-        self.edit_tab = QWidget()
-        self.tabs.addTab(self.single_tab, "Single View")
-        self.tabs.addTab(self.compare_tab, "Compare")
-        self.tabs.addTab(self.edit_tab, "Edit + Upscale")
+        self._refresh_all_image_lists()  # DIFF-002-001
 
-        self._build_single_tab()
-        self._build_compare_tab()
-        self._build_edit_tab()
+    def _build_unified_viewer(self, layout: QVBoxLayout) -> None:  # DIFF-002-001
+        main_splitter = QSplitter(Qt.Vertical)  # DIFF-002-001
 
-        self._refresh_all_image_lists()
+        list_splitter = QSplitter(Qt.Horizontal)  # DIFF-002-001
+        self.left_list_panel, self.compare_left_list, self.compare_left_filter = self._create_list_panel(  # DIFF-002-001
+            "Left Image",  # DIFF-002-001
+            refresh=True,  # DIFF-002-001
+        )
+        self.left_list_panel.setMinimumWidth(240)  # DIFF-002-006
+        self.compare_left_list.itemSelectionChanged.connect(self._on_compare_left_selected)  # DIFF-002-001
+        self.edit_list_panel, self.edit_list, self.edit_filter = self._create_list_panel(  # DIFF-002-001
+            "Right Image",  # DIFF-002-001
+            refresh=False,  # DIFF-002-001
+        )
+        self.edit_list_panel.setMinimumWidth(240)  # DIFF-002-006
+        self.edit_list.itemSelectionChanged.connect(self._on_edit_selected)  # DIFF-002-005
+        list_splitter.addWidget(self.left_list_panel)  # DIFF-002-001
+        list_splitter.addWidget(self.edit_list_panel)  # DIFF-002-001
+        list_splitter.setStretchFactor(0, 1)  # DIFF-002-006
+        list_splitter.setStretchFactor(1, 1)  # DIFF-002-006
+        main_splitter.addWidget(list_splitter)  # DIFF-002-001
+
+        content_splitter = QSplitter(Qt.Horizontal)  # DIFF-002-001
+
+        image_splitter = QSplitter(Qt.Horizontal)  # DIFF-002-001
+
+        left_panel = QGroupBox("Left Image")  # DIFF-002-001
+        left_panel.setMinimumWidth(480)  # DIFF-002-006
+        left_panel_layout = QVBoxLayout(left_panel)  # DIFF-002-001
+        self._apply_section_layout(left_panel_layout)  # DIFF-002-001
+        left_header = QHBoxLayout()  # DIFF-002-001
+        self.compare_left_info = QLabel("No image selected.")  # DIFF-002-001
+        self.compare_left_info.setWordWrap(True)  # DIFF-002-001
+        left_header.addWidget(self.compare_left_info)  # DIFF-002-001
+        left_header.addStretch(1)  # DIFF-002-001
+        left_header.addWidget(self._help_button("Ctrl + mouse wheel to zoom left view."))  # DIFF-002-001
+        left_panel_layout.addLayout(left_header)  # DIFF-002-001
+        self.compare_left_view = ZoomableImageView()  # DIFF-002-001
+        left_body = QHBoxLayout()  # DIFF-002-001
+        left_body.setSpacing(UI_INNER_GAP)  # DIFF-002-001
+        left_body.addWidget(self._build_vertical_zoom_controls(self.compare_left_view))  # DIFF-002-002
+        left_body.addWidget(self.compare_left_view, 1)  # DIFF-002-001
+        left_panel_layout.addLayout(left_body)  # DIFF-002-001
+
+        right_panel = QGroupBox("Right Image")  # DIFF-002-001
+        right_panel.setMinimumWidth(480)  # DIFF-002-006
+        right_panel_layout = QVBoxLayout(right_panel)  # DIFF-002-001
+        self._apply_section_layout(right_panel_layout)  # DIFF-002-001
+        right_header = QHBoxLayout()  # DIFF-002-001
+        self.edit_info = QLabel("No image selected.")  # DIFF-002-001
+        self.edit_info.setWordWrap(True)  # DIFF-002-001
+        right_header.addWidget(self.edit_info)  # DIFF-002-001
+        right_header.addStretch(1)  # DIFF-002-001
+        right_header.addWidget(self._help_button("Ctrl + mouse wheel to zoom right view."))  # DIFF-002-001
+        right_panel_layout.addLayout(right_header)  # DIFF-002-001
+        self.edit_view = ZoomableImageView()  # DIFF-002-005
+        right_body = QHBoxLayout()  # DIFF-002-001
+        right_body.setSpacing(UI_INNER_GAP)  # DIFF-002-001
+        right_body.addWidget(self.edit_view, 1)  # DIFF-002-001
+        right_body.addWidget(self._build_vertical_zoom_controls(self.edit_view))  # DIFF-002-003
+        right_panel_layout.addLayout(right_body)  # DIFF-002-001
+
+        image_splitter.addWidget(left_panel)  # DIFF-002-001
+        image_splitter.addWidget(right_panel)  # DIFF-002-001
+        image_splitter.setStretchFactor(0, 1)  # DIFF-002-006
+        image_splitter.setStretchFactor(1, 1)  # DIFF-002-006
+        content_splitter.addWidget(image_splitter)  # DIFF-002-001
+
+        controls_panel = QGroupBox("Edit controls (Right image).")  # DIFF-002-004
+        controls_layout = QVBoxLayout(controls_panel)  # DIFF-002-004
+        self._apply_section_layout(controls_layout)  # DIFF-002-004
+
+        adjustments_panel = QGroupBox("Adjustments")  # DIFF-002-004
+        adjustments_layout = QVBoxLayout(adjustments_panel)  # DIFF-002-004
+        self._apply_section_layout(adjustments_layout)  # DIFF-002-004
+        self._build_adjustment_controls(adjustments_layout)  # DIFF-002-004
+
+        action_row = QHBoxLayout()  # DIFF-002-004
+        self.reset_adjustments_btn = QPushButton("Reset Adjustments")  # DIFF-002-004
+        self._standard_button(self.reset_adjustments_btn)  # DIFF-002-004
+        self.reset_adjustments_btn.clicked.connect(self._reset_adjustments)  # DIFF-002-004
+        self.save_adjustments_btn = QPushButton("Save Adjusted Copy")  # DIFF-002-004
+        self._standard_button(self.save_adjustments_btn)  # DIFF-002-004
+        self.save_adjustments_btn.clicked.connect(self._save_adjusted_copy)  # DIFF-002-004
+        action_row.addWidget(self.reset_adjustments_btn)  # DIFF-002-004
+        action_row.addWidget(self.save_adjustments_btn)  # DIFF-002-004
+        action_row.addStretch(1)  # DIFF-002-004
+        adjustments_layout.addLayout(action_row)  # DIFF-002-004
+        controls_layout.addWidget(adjustments_panel)  # DIFF-002-004
+
+        upscale_panel = QGroupBox("Upscale")  # DIFF-002-004
+        upscale_layout = QVBoxLayout(upscale_panel)  # DIFF-002-004
+        self._apply_section_layout(upscale_layout)  # DIFF-002-004
+        upscale_row = QHBoxLayout()  # DIFF-002-004
+        upscale_row.addWidget(QLabel("Scale"))  # DIFF-002-004
+        self.upscale_combo = QComboBox()  # DIFF-002-004
+        self.upscale_combo.addItems(["2x", "3x", "4x"])  # DIFF-002-004
+        upscale_row.addWidget(self.upscale_combo)  # DIFF-002-004
+        upscale_row.addStretch(1)  # DIFF-002-004
+        upscale_layout.addLayout(upscale_row)  # DIFF-002-004
+        self.save_upscale_btn = QPushButton("Save Upscaled Copy")  # DIFF-002-004
+        self._standard_button(self.save_upscale_btn)  # DIFF-002-004
+        self.save_upscale_btn.clicked.connect(self._save_upscaled_copy)  # DIFF-002-004
+        upscale_layout.addWidget(self.save_upscale_btn)  # DIFF-002-004
+        controls_layout.addWidget(upscale_panel)  # DIFF-002-004
+
+        controls_scroll = QScrollArea()  # DIFF-002-004
+        controls_scroll.setWidgetResizable(True)  # DIFF-002-004
+        controls_scroll.setFrameShape(QFrame.NoFrame)  # DIFF-002-004
+        controls_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)  # DIFF-002-004
+        controls_scroll.setWidget(controls_panel)  # DIFF-002-004
+        controls_scroll.setMinimumWidth(320)  # DIFF-002-006
+        content_splitter.addWidget(controls_scroll)  # DIFF-002-004
+        content_splitter.setStretchFactor(0, 3)  # DIFF-002-006
+        content_splitter.setStretchFactor(1, 1)  # DIFF-002-006
+        main_splitter.addWidget(content_splitter)  # DIFF-002-001
+
+        self._init_splitter(main_splitter, "viewer/unified", [220, 780])  # DIFF-002-006
+        main_splitter.setStretchFactor(0, 1)  # DIFF-002-006
+        main_splitter.setStretchFactor(1, 3)  # DIFF-002-006
+        layout.addWidget(main_splitter)  # DIFF-002-001
 
     def _build_single_tab(self) -> None:
         layout = QVBoxLayout(self.single_tab)
@@ -632,6 +742,26 @@ class ViewerTab(QWidget):
         row.addWidget(zoom_slider)
         row.addStretch(1)
         return row
+
+    def _build_vertical_zoom_controls(self, view: ZoomableImageView) -> QWidget:  # DIFF-002-002
+        container = QWidget()  # DIFF-002-002
+        layout = QVBoxLayout(container)  # DIFF-002-002
+        layout.setContentsMargins(0, 0, 0, 0)  # DIFF-002-002
+        layout.setSpacing(UI_INNER_GAP)  # DIFF-002-002
+        zoom_label = QLabel("Zoom: 100%")  # DIFF-002-002
+        zoom_label.setAlignment(Qt.AlignCenter)  # DIFF-002-002
+        zoom_slider = QSlider(Qt.Vertical)  # DIFF-002-002
+        zoom_slider.setRange(10, 1600)  # DIFF-002-002
+        zoom_slider.setValue(100)  # DIFF-002-002
+        zoom_slider.setSingleStep(10)  # DIFF-002-002
+        zoom_slider.setPageStep(50)  # DIFF-002-002
+        zoom_slider.setMinimumHeight(160)  # DIFF-002-002
+        zoom_slider.setFixedWidth(26)  # DIFF-002-002
+        zoom_slider.valueChanged.connect(lambda val: view.set_zoom_percent(val))  # DIFF-002-002
+        view.zoom_changed.connect(lambda val, slider=zoom_slider, label=zoom_label: self._sync_zoom_controls(slider, label, val))  # DIFF-002-002
+        layout.addWidget(zoom_slider, 1)  # DIFF-002-002
+        layout.addWidget(zoom_label)  # DIFF-002-002
+        return container  # DIFF-002-002
 
     def _sync_zoom_controls(self, slider: QSlider, label: QLabel, value: int) -> None:
         slider.blockSignals(True)

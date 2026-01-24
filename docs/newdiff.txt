@@ -1,0 +1,7 @@
+“Read docs/diffs/DIFF-00X.md and docs/agents/AGENT_PROMPT.md”
+
+“Implement only DIFF scope”
+
+“Tag all changes”
+
+“Report completion with file list + tags”
